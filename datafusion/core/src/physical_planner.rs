@@ -892,6 +892,22 @@ impl DefaultPhysicalPlanner {
                     return exec_err!("Table '{table_name}' does not exist");
                 }
             }
+            LogicalPlan::Dml(DmlStatement {
+                table_name: _,
+                op: WriteOp::Update,
+                ..
+            }) => {
+                // DataFusion is a read-only query engine, but also a library, so consumers may implement this
+                return not_impl_err!("UPDATE Query Support Coming soon");
+            }
+            LogicalPlan::Dml(DmlStatement {
+                table_name: _,
+                op: WriteOp::Delete,
+                ..
+            }) => {
+                // DataFusion is a read-only query engine, but also a library, so consumers may implement this
+                return not_impl_err!("DELETE Query Support Coming soon");
+            }
             LogicalPlan::Window(Window {
                 input, window_expr, ..
             }) => {
