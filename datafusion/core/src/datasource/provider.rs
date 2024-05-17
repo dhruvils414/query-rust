@@ -281,6 +281,24 @@ pub trait TableProvider: Sync + Send {
     ) -> Result<Arc<dyn ExecutionPlan>> {
         not_impl_err!("Insert into not implemented for this table")
     }
+
+    async fn update_table(
+        &self,
+        _state: &SessionState,
+        _input: Arc<dyn ExecutionPlan>,
+        _overwrite: bool,
+    ) -> Result<Arc<dyn ExecutionPlan>> {
+        not_impl_err!("Update table not implemented for this table")
+    }
+
+    async fn delete_from_table(
+        &self,
+        _state: &SessionState,
+        _input: Arc<dyn ExecutionPlan>,
+        _overwrite: bool,
+    ) -> Result<Arc<dyn ExecutionPlan>> {
+        not_impl_err!("Delete from table not implemented for this table")
+    }
 }
 
 /// A factory which creates [`TableProvider`]s at runtime given a URL.

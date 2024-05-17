@@ -890,8 +890,13 @@ impl DataFrame {
     /// ```
     pub async fn collect(self) -> Result<Vec<RecordBatch>> {
         let task_ctx = Arc::new(self.task_ctx());
+        println!("Creating a physical plan");
         let plan = self.create_physical_plan().await?;
-        collect(plan, task_ctx).await
+        println!("Physical Plan created");
+        let result = collect(plan, task_ctx).await;
+        println!("Physical Plan collected");
+
+        return result;
     }
 
     /// Execute the `DataFrame` and print the results to the console.
@@ -910,6 +915,7 @@ impl DataFrame {
     /// ```
     pub async fn show(self) -> Result<()> {
         let results = self.collect().await?;
+        println!("Results compiled {:#?}", results);
         Ok(pretty::print_batches(&results)?)
     }
 

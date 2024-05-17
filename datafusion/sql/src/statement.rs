@@ -156,7 +156,7 @@ fn calc_inline_constraints_from_columns(columns: &[ColumnDef]) -> Vec<TableConst
 impl<'a, S: ContextProvider> SqlToRel<'a, S> {
     /// Generate a logical plan from an DataFusion SQL statement
     pub fn statement_to_plan(&self, statement: DFStatement) -> Result<LogicalPlan> {
-        match statement {
+        let plan = match statement {
             DFStatement::CreateExternalTable(s) => self.external_table_to_plan(s),
             DFStatement::Statement(s) => self.sql_statement_to_plan(*s),
             DFStatement::CopyTo(s) => self.copy_to_plan(s),
@@ -165,15 +165,19 @@ impl<'a, S: ContextProvider> SqlToRel<'a, S> {
                 analyze,
                 statement,
             }) => self.explain_to_plan(verbose, analyze, *statement),
-        }
+        };
+        println!("Exiting statement_to_plan function");
+        return plan;
     }
 
     /// Generate a logical plan from an SQL statement
     pub fn sql_statement_to_plan(&self, statement: Statement) -> Result<LogicalPlan> {
-        self.sql_statement_to_plan_with_context_impl(
+        let plan = self.sql_statement_to_plan_with_context_impl(
             statement,
             &mut PlannerContext::new(),
-        )
+        );
+        println!("Exiting sql_statement_to_plan function");
+        return plan;
     }
 
     /// Generate a logical plan from an SQL statement
@@ -531,6 +535,7 @@ impl<'a, S: ContextProvider> SqlToRel<'a, S> {
                 selection,
                 returning,
             } => {
+                println!("UPDATE statement reached here");
                 if returning.is_some() {
                     plan_err!("Update-returning clause not yet supported")?;
                 }
@@ -1222,6 +1227,7 @@ impl<'a, S: ContextProvider> SqlToRel<'a, S> {
         from: Option<TableWithJoins>,
         predicate_expr: Option<Expr>,
     ) -> Result<LogicalPlan> {
+        println!("Inside update to plan function");
         let (table_name, table_alias) = match &table.relation {
             TableFactor::Table { name, alias, .. } => (name.clone(), alias.clone()),
             _ => plan_err!("Cannot update non-table relation!")?,
@@ -1324,6 +1330,7 @@ impl<'a, S: ContextProvider> SqlToRel<'a, S> {
             WriteOp::Update,
             Arc::new(source),
         ));
+        println!("Exiting update to plan function");
         Ok(plan)
     }
 

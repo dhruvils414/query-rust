@@ -474,6 +474,7 @@ impl SessionContext {
         options: SQLOptions,
     ) -> Result<DataFrame> {
         let plan = self.state().create_logical_plan(sql).await?;
+        println!("{:#?}", plan);
         options.verify_plan(&plan)?;
 
         self.execute_logical_plan(plan).await
@@ -524,7 +525,10 @@ impl SessionContext {
                 self.set_variable(stmt).await
             }
 
-            plan => Ok(DataFrame::new(self.state(), plan)),
+            plan =>{
+                println!("Insider execute logical plan. Returning Ok(DataFrame)");
+                Ok(DataFrame::new(self.state(), plan))
+            }
         }
     }
 

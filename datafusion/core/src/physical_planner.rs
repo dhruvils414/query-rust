@@ -893,20 +893,38 @@ impl DefaultPhysicalPlanner {
                 }
             }
             LogicalPlan::Dml(DmlStatement {
-                table_name: _,
+                table_name,
                 op: WriteOp::Update,
                 ..
             }) => {
-                // DataFusion is a read-only query engine, but also a library, so consumers may implement this
-                return not_impl_err!("UPDATE Query Support Coming soon");
+                let name = table_name.table();
+                let schema = session_state.schema_for_ref(table_name.clone())?;
+                if let Some(provider) = schema.table(name).await? {
+                    let update_exec = children.one()?;
+                    println!("Update Execution Plan {:#?}", update_exec);
+                    provider
+                        .update_table(session_state, update_exec, false)
+                        .await?
+                } else {
+                    return exec_err!("Table '{table_name}' does not exist");
+                }
             }
             LogicalPlan::Dml(DmlStatement {
-                table_name: _,
+                table_name,
                 op: WriteOp::Delete,
                 ..
             }) => {
-                // DataFusion is a read-only query engine, but also a library, so consumers may implement this
-                return not_impl_err!("DELETE Query Support Coming soon");
+                let name = table_name.table();
+                let schema = session_state.schema_for_ref(table_name.clone())?;
+                if let Some(provider) = schema.table(name).await? {
+                    let delete_exec = children.one()?;
+                    println!("Update Execution Plan {:#?}", delete_exec);
+                    provider
+                        .delete_from_table(session_state, delete_exec, false)
+                        .await?
+                } else {
+                    return exec_err!("Table '{table_name}' does not exist");
+                }
             }
             LogicalPlan::Window(Window {
                 input, window_expr, ..
