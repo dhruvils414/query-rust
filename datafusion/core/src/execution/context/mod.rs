@@ -526,7 +526,7 @@ impl SessionContext {
             }
 
             plan =>{
-                println!("Insider execute logical plan. Returning Ok(DataFrame)");
+                println!("Inside execute logical plan. Returning Ok(DataFrame)");
                 Ok(DataFrame::new(self.state(), plan))
             }
         }

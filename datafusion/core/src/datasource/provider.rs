@@ -282,6 +282,7 @@ pub trait TableProvider: Sync + Send {
         not_impl_err!("Insert into not implemented for this table")
     }
 
+    /// Update Table implementation
     async fn update_table(
         &self,
         _state: &SessionState,
@@ -291,6 +292,7 @@ pub trait TableProvider: Sync + Send {
         not_impl_err!("Update table not implemented for this table")
     }
 
+    /// Delete from a table
     async fn delete_from_table(
         &self,
         _state: &SessionState,

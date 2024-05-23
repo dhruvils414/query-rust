@@ -1,25 +1,5 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
-
-//! Execution plan for writing data to [`DataSink`]s
-
 use std::any::Any;
 use std::fmt;
-use std::fmt::Debug;
 use std::sync::Arc;
 
 use super::{
@@ -32,58 +12,23 @@ use crate::stream::RecordBatchStreamAdapter;
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use arrow_array::{ArrayRef, UInt64Array};
-use arrow_schema::{DataType, Field, Schema};
 use datafusion_common::{exec_err, internal_err, Result};
 use datafusion_execution::TaskContext;
-use datafusion_physical_expr::{
-    Distribution, EquivalenceProperties, PhysicalSortRequirement,
+use datafusion_physical_expr::{Distribution, PhysicalSortRequirement, EquivalenceProperties};
+use crate::insert::{
+    DataSink,
+    make_count_schema
 };
 
-use async_trait::async_trait;
 use futures::StreamExt;
 
-/// `DataSink` implements writing streams of [`RecordBatch`]es to
-/// user defined destinations.
+/// Execution plan for updating record batches to a [`DataSink`]
 ///
-/// The `Display` impl is used to format the sink for explain plan
-/// output.
-#[async_trait]
-pub trait DataSink: DisplayAs + Debug + Send + Sync {
-    /// Returns the data sink as [`Any`](std::any::Any) so that it can be
-    /// downcast to a specific implementation.
-    fn as_any(&self) -> &dyn Any;
-
-    /// Return a snapshot of the [MetricsSet] for this
-    /// [DataSink].
-    ///
-    /// See [ExecutionPlan::metrics()] for more details
-    fn metrics(&self) -> Option<MetricsSet>;
-
-    // TODO add desired input ordering
-    // How does this sink want its input ordered?
-
-    /// Writes the data to the sink, returns the number of values written
-    ///
-    /// This method will be called exactly once during each DML
-    /// statement. Thus prior to return, the sink should do any commit
-    /// or rollback required.
-    async fn write_all(
-        &self,
-        data: SendableRecordBatchStream,
-        context: &Arc<TaskContext>,
-    ) -> Result<u64>;
-}
-
-#[deprecated(since = "38.0.0", note = "Use [`DataSinkExec`] instead")]
-pub type FileSinkExec = DataSinkExec;
-
-/// Execution plan for writing record batches to a [`DataSink`]
-///
-/// Returns a single row with the number of values written
-pub struct DataSinkExec {
-    /// Input plan that produces the record batches to be written.
+/// Returns a single row with the number of values updated
+pub struct UpdateSinkExec {
+    /// Input plan that produces the record batches to be updated.
     input: Arc<dyn ExecutionPlan>,
-    /// Sink to which to write
+    /// Sink to which to update
     sink: Arc<dyn DataSink>,
     /// Schema of the sink for validating the input data
     sink_schema: SchemaRef,
@@ -94,14 +39,14 @@ pub struct DataSinkExec {
     cache: PlanProperties,
 }
 
-impl fmt::Debug for DataSinkExec {
+impl fmt::Debug for UpdateSinkExec {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "DataSinkExec schema: {:?}", self.count_schema)
+        write!(f, "UpdateSinkExec schema: {:?}", self.count_schema)
     }
 }
 
-impl DataSinkExec {
-    /// Create a plan to write to `sink`
+impl UpdateSinkExec {
+    /// Create a plan to update the `sink`
     pub fn new(
         input: Arc<dyn ExecutionPlan>,
         sink: Arc<dyn DataSink>,
@@ -116,8 +61,20 @@ impl DataSinkExec {
             sink_schema,
             count_schema: make_count_schema(),
             sort_order,
-            cache,
+            cache
         }
+    }
+
+    fn create_schema(
+        input: &Arc<dyn ExecutionPlan>,
+        schema: SchemaRef,
+    ) -> PlanProperties {
+        let eq_properties = EquivalenceProperties::new(schema);
+        PlanProperties::new(
+            eq_properties,
+            Partitioning::UnknownPartitioning(1),
+            input.execution_mode(),
+        )
     }
 
     fn execute_input_stream(
@@ -155,7 +112,7 @@ impl DataSinkExec {
             Ok(Box::pin(RecordBatchStreamAdapter::new(
                 self.sink_schema.clone(),
                 input_stream
-                    .map(move |batch| check_not_null_contraits(batch?, &risky_columns)),
+                    .map(move |batch| check_not_null_constraints(batch?, &risky_columns)),
             )))
         }
     }
@@ -165,7 +122,7 @@ impl DataSinkExec {
         &self.input
     }
 
-    /// Returns insert sink
+    /// Returns update sink
     pub fn sink(&self) -> &dyn DataSink {
         self.sink.as_ref()
     }
@@ -179,21 +136,9 @@ impl DataSinkExec {
     pub fn metrics(&self) -> Option<MetricsSet> {
         self.sink.metrics()
     }
-
-    fn create_schema(
-        input: &Arc<dyn ExecutionPlan>,
-        schema: SchemaRef,
-    ) -> PlanProperties {
-        let eq_properties = EquivalenceProperties::new(schema);
-        PlanProperties::new(
-            eq_properties,
-            Partitioning::UnknownPartitioning(1),
-            input.execution_mode(),
-        )
-    }
 }
 
-impl DisplayAs for DataSinkExec {
+impl DisplayAs for UpdateSinkExec {
     fn fmt_as(
         &self,
         t: DisplayFormatType,
@@ -201,21 +146,22 @@ impl DisplayAs for DataSinkExec {
     ) -> std::fmt::Result {
         match t {
             DisplayFormatType::Default | DisplayFormatType::Verbose => {
-                write!(f, "DataSinkExec: sink=")?;
+                write!(f, "UpdateSinkExec: sink=")?;
                 self.sink.fmt_as(t, f)
             }
         }
     }
 }
 
-impl ExecutionPlan for DataSinkExec {
-    fn name(&self) -> &'static str {
-        "DataSinkExec"
-    }
-
+impl ExecutionPlan for UpdateSinkExec {
     /// Return a reference to Any that can be used for downcasting
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    /// Get the schema for this execution plan
+    fn schema(&self) -> SchemaRef {
+        self.count_schema.clone()
     }
 
     fn properties(&self) -> &PlanProperties {
@@ -241,10 +187,10 @@ impl ExecutionPlan for DataSinkExec {
     }
 
     fn maintains_input_order(&self) -> Vec<bool> {
-        // Maintains ordering in the sense that the written file will reflect
+        // Maintains ordering in the sense that the updated records will reflect
         // the ordering of the input. For more context, see:
         //
-        // https://github.com/apache/datafusion/pull/6354#discussion_r1195284178
+        // https://github.com/apache/arrow-datafusion/pull/6354#discussion_r1195284178
         vec![true]
     }
 
@@ -256,13 +202,16 @@ impl ExecutionPlan for DataSinkExec {
         self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        Ok(Arc::new(Self::new(
-            children[0].clone(),
-            self.sink.clone(),
-            self.sink_schema.clone(),
-            self.sort_order.clone(),
-        )))
+        Ok(Arc::new(Self {
+            input: children[0].clone(),
+            sink: self.sink.clone(),
+            sink_schema: self.sink_schema.clone(),
+            count_schema: self.count_schema.clone(),
+            sort_order: self.sort_order.clone(),
+            cache: self.cache.clone()
+        }))
     }
+
 
     /// Execute the plan and return a stream of `RecordBatch`es for
     /// the specified partition.
@@ -272,7 +221,7 @@ impl ExecutionPlan for DataSinkExec {
         context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream> {
         if partition != 0 {
-            return internal_err!("DataSinkExec can only be called on partition 0!");
+            return internal_err!("UpdateSinkExec can only be called on partition 0!");
         }
         let data = self.execute_input_stream(0, context.clone())?;
 
@@ -291,7 +240,7 @@ impl ExecutionPlan for DataSinkExec {
     }
 }
 
-/// Create a output record batch with a count
+/// Create an output record batch with a count
 ///
 /// ```text
 /// +-------+,
@@ -300,22 +249,14 @@ impl ExecutionPlan for DataSinkExec {
 /// | 6     |,
 /// +-------+,
 /// ```
-fn make_count_batch(count: u64) -> RecordBatch {
+pub fn make_count_batch(count: u64) -> RecordBatch {
     let array = Arc::new(UInt64Array::from(vec![count])) as ArrayRef;
 
     RecordBatch::try_from_iter_with_nullable(vec![("count", array, false)]).unwrap()
 }
 
-pub fn make_count_schema() -> SchemaRef {
-    // define a schema.
-    Arc::new(Schema::new(vec![Field::new(
-        "count",
-        DataType::UInt64,
-        false,
-    )]))
-}
 
-fn check_not_null_contraits(
+fn check_not_null_constraints(
     batch: RecordBatch,
     column_indices: &Vec<usize>,
 ) -> Result<RecordBatch> {
@@ -335,6 +276,5 @@ fn check_not_null_contraits(
             );
         }
     }
-
     Ok(batch)
 }

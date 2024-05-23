@@ -585,7 +585,10 @@ impl DefaultPhysicalPlanner {
         logical_plan: &LogicalPlan,
         session_state: &SessionState,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        // DFS the tree to flatten it into a Vec.
+        // Conduct a DFS on the tree to flatten it into a Vec.
+        // This will give a topological Sort 
+        // ( approx : for us to determine the order of execution for child-nodes )
+
         // This will allow us to build the Physical Plan from the leaves up
         // to avoid recursion, and also to make it easier to build a valid
         // Physical Plan from the start and not rely on some intermediate
@@ -628,6 +631,7 @@ impl DefaultPhysicalPlanner {
             .config_options()
             .execution
             .planning_concurrency;
+
         // Can never spawn more tasks than leaves in the tree, as these tasks must
         // all converge down to the root node, which can only be processed by a
         // single task.
@@ -637,6 +641,8 @@ impl DefaultPhysicalPlanner {
         let tasks = flat_tree_leaf_indices
             .into_iter()
             .map(|index| self.task_helper(index, flat_tree.clone(), session_state));
+
+        // Collect the outputs plans into a single node
         let mut outputs = futures::stream::iter(tasks)
             .buffer_unordered(max_concurrency)
             .try_collect::<Vec<_>>()
@@ -644,12 +650,14 @@ impl DefaultPhysicalPlanner {
             .into_iter()
             .flatten()
             .collect::<Vec<_>>();
+
         // Ideally this never happens if we have a valid LogicalPlan tree
         if outputs.len() != 1 {
             return internal_err!(
                 "Failed to convert LogicalPlan to ExecutionPlan: More than one root detected"
             );
         }
+
         let plan = outputs.pop().unwrap();
         Ok(plan)
     }
@@ -671,6 +679,7 @@ impl DefaultPhysicalPlanner {
                 "Invalid index whilst creating initial physical plan"
             )
         })?;
+
         let mut plan = self
             .map_logical_node_to_physical(
                 node.node,
@@ -678,7 +687,9 @@ impl DefaultPhysicalPlanner {
                 ChildrenContainer::None,
             )
             .await?;
+
         let mut current_index = leaf_starter_index;
+
         // parent_index is None only for root
         while let Some(parent_index) = node.parent_index {
             node = flat_tree.get(parent_index).ok_or_else(|| {
@@ -734,6 +745,7 @@ impl DefaultPhysicalPlanner {
             }
             current_index = parent_index;
         }
+
         // Only one task should ever reach this point for a valid LogicalPlan tree.
         Ok(Some(plan))
     }
