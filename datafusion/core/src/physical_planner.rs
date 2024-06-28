@@ -767,14 +767,23 @@ impl DefaultPhysicalPlanner {
                 ..
             }) => {
                 let source = source_as_provider(source)?;
+
                 // Remove all qualifiers from the scan as the provider
                 // doesn't know (nor should care) how the relation was
                 // referred to in the query
                 let filters = unnormalize_cols(filters.iter().cloned());
-                source
+
+                match source
                     .scan(session_state, projection.as_ref(), &filters, *fetch)
-                    .await?
-            }
+                    .await {
+                        Ok(provider) => {
+                            provider
+                        },
+                        Err(e) => {
+                            return exec_err!("Error in provider {:?}", e);
+                        }
+                    }
+            },
             LogicalPlan::Values(Values { values, schema }) => {
                 let exec_schema = schema.as_ref().to_owned().into();
                 let exprs = values
@@ -913,7 +922,6 @@ impl DefaultPhysicalPlanner {
                 let schema = session_state.schema_for_ref(table_name.clone())?;
                 if let Some(provider) = schema.table(name).await? {
                     let update_exec = children.one()?;
-                    println!("Update Execution Plan {:#?}", update_exec);
                     provider
                         .update_table(session_state, update_exec, false)
                         .await?
@@ -930,7 +938,6 @@ impl DefaultPhysicalPlanner {
                 let schema = session_state.schema_for_ref(table_name.clone())?;
                 if let Some(provider) = schema.table(name).await? {
                     let delete_exec = children.one()?;
-                    println!("Update Execution Plan {:#?}", delete_exec);
                     provider
                         .delete_from_table(session_state, delete_exec, false)
                         .await?

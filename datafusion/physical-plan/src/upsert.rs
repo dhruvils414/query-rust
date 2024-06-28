@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::fmt::Debug;
 use std::fmt;
 use std::sync::Arc;
 
@@ -8,28 +9,63 @@ use super::{
 };
 use crate::metrics::MetricsSet;
 use crate::stream::RecordBatchStreamAdapter;
+use crate::CoalescePartitionsExec;
+// use crate::projection::ProjectionExec;
+use crate::coalesce_batches::CoalesceBatchesExec;
 
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use arrow_array::{ArrayRef, UInt64Array};
 use datafusion_common::{exec_err, internal_err, Result};
 use datafusion_execution::TaskContext;
-use datafusion_physical_expr::{Distribution, PhysicalSortRequirement, EquivalenceProperties};
-use crate::insert::{
-    DataSink,
-    make_count_schema
-};
+use datafusion_physical_expr::{Distribution, PhysicalSortRequirement, EquivalenceProperties, PhysicalExpr};
+use crate::insert::make_count_schema;
+use crate::filter::FilterExec;
 
 use futures::StreamExt;
+use async_trait::async_trait;
 
-/// Execution plan for updating record batches to a [`DataSink`]
+/// `OverwriteSink` implements updating streams of [`RecordBatch`]es in
+/// user defined destinations.
+///
+/// The `Display` impl is used to format the sink for explain plan
+/// output.
+#[async_trait]
+pub trait OverwriteSink: DisplayAs + Debug + Send + Sync {
+    /// Returns the data sink as [`Any`](std::any::Any) so that it can be
+    /// downcast to a specific implementation.
+    fn as_any(&self) -> &dyn Any;
+
+    /// Return a snapshot of the [MetricsSet] for this
+    /// [OverwriteSink].
+    ///
+    /// See [ExecutionPlan::metrics()] for more details
+    fn metrics(&self) -> Option<MetricsSet>;
+
+    // TODO add desired input ordering
+    // How does this sink want its input ordered?
+
+    /// Writes the data to the sink, returns the number of values written
+    ///
+    /// This method will be called exactly once during each DML
+    /// statement. Thus prior to return, the sink should do any commit
+    /// or rollback required.
+    async fn overwrite_with(
+        &self,
+        data: SendableRecordBatchStream,
+        context: &Arc<TaskContext>,
+        filter: Option<Arc<dyn PhysicalExpr>>,
+    ) -> Result<u64>;
+}
+
+/// Execution plan for updating record batches to a [`OverwriteSink`]
 ///
 /// Returns a single row with the number of values updated
 pub struct UpdateSinkExec {
     /// Input plan that produces the record batches to be updated.
     input: Arc<dyn ExecutionPlan>,
     /// Sink to which to update
-    sink: Arc<dyn DataSink>,
+    sink: Arc<dyn OverwriteSink>,
     /// Schema of the sink for validating the input data
     sink_schema: SchemaRef,
     /// Schema describing the structure of the output data.
@@ -49,7 +85,7 @@ impl UpdateSinkExec {
     /// Create a plan to update the `sink`
     pub fn new(
         input: Arc<dyn ExecutionPlan>,
-        sink: Arc<dyn DataSink>,
+        sink: Arc<dyn OverwriteSink>,
         sink_schema: SchemaRef,
         sort_order: Option<Vec<PhysicalSortRequirement>>,
     ) -> Self {
@@ -123,7 +159,7 @@ impl UpdateSinkExec {
     }
 
     /// Returns update sink
-    pub fn sink(&self) -> &dyn DataSink {
+    pub fn sink(&self) -> &dyn OverwriteSink {
         self.sink.as_ref()
     }
 
@@ -132,7 +168,7 @@ impl UpdateSinkExec {
         &self.sort_order
     }
 
-    /// Returns the metrics of the underlying [DataSink]
+    /// Returns the metrics of the underlying [OverwriteSink]
     pub fn metrics(&self) -> Option<MetricsSet> {
         self.sink.metrics()
     }
@@ -169,13 +205,13 @@ impl ExecutionPlan for UpdateSinkExec {
     }
 
     fn benefits_from_input_partitioning(&self) -> Vec<bool> {
-        // DataSink is responsible for dynamically partitioning its
+        // OverwriteSink is responsible for dynamically partitioning its
         // own input at execution time.
         vec![false]
     }
 
     fn required_input_distribution(&self) -> Vec<Distribution> {
-        // DataSink is responsible for dynamically partitioning its
+        // OverwriteSink is responsible for dynamically partitioning its
         // own input at execution time, and so requires a single input partition.
         vec![Distribution::SinglePartition; self.children().len()]
     }
@@ -223,13 +259,38 @@ impl ExecutionPlan for UpdateSinkExec {
         if partition != 0 {
             return internal_err!("UpdateSinkExec can only be called on partition 0!");
         }
+
         let data = self.execute_input_stream(0, context.clone())?;
+        // NOTE :: This data stream that contains the output rows from the filterExec
+
+        // let filter_predicate = if let Some(coalesce_partition_exec) = self.input.as_any().downcast_ref::<CoalescePartitionsExec>() {
+        //     let project_exec = coalesce_partition_exec.input().as_any().downcast_ref::<ProjectionExec>().unwrap();
+        //     let coalesce_batch_exec = project_exec.input().as_any().downcast_ref::<CoalesceBatchesExec>().unwrap();
+
+        //     let filter_exec = coalesce_batch_exec.input().as_any().downcast_ref::<FilterExec>().unwrap();
+
+        //     Some(filter_exec.predicate().clone())
+
+        // } else {
+        //     None
+        // };
+
+        let filter_predicate = if let Some(coalesce_partition_exec) = self.input.as_any().downcast_ref::<CoalescePartitionsExec>() {
+            let coalesce_batch_exec = coalesce_partition_exec.input().as_any().downcast_ref::<CoalesceBatchesExec>().unwrap();
+
+            let filter_exec = coalesce_batch_exec.input().as_any().downcast_ref::<FilterExec>().unwrap();
+
+            Some(filter_exec.predicate().clone())
+
+        } else {
+            None
+        };
 
         let count_schema = self.count_schema.clone();
         let sink = self.sink.clone();
 
         let stream = futures::stream::once(async move {
-            sink.write_all(data, &context).await.map(make_count_batch)
+            sink.overwrite_with(data, &context, filter_predicate).await.map(make_count_batch)
         })
         .boxed();
 

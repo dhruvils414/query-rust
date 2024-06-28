@@ -35,6 +35,7 @@ use crate::{
 use arrow::compute::filter_record_batch;
 use arrow::datatypes::{DataType, SchemaRef};
 use arrow::record_batch::RecordBatch;
+use arrow_array::BooleanArray;
 use datafusion_common::cast::as_boolean_array;
 use datafusion_common::stats::Precision;
 use datafusion_common::{plan_err, DataFusionError, Result};
@@ -339,6 +340,32 @@ struct FilterExecStream {
     baseline_metrics: BaselineMetrics,
 }
 
+pub(crate) fn invert_boolean_array(boolean_array: &BooleanArray) -> Result<BooleanArray> {
+    let mut builder = BooleanArray::builder(boolean_array.len());
+
+    for i in 0..boolean_array.len() {
+        builder.append_value(!boolean_array.value(i));
+    }
+
+    Ok(builder.finish())
+}
+
+pub(crate) fn _batch_filter_negative(
+    batch: &RecordBatch,
+    predicate: &Arc<dyn PhysicalExpr>,
+) -> Result<RecordBatch> {
+    predicate
+        .evaluate(batch)
+        .and_then(|v| v.into_array(batch.num_rows()))
+        .and_then(|array| {
+            let filter_array = as_boolean_array(&array)?;
+
+            let inverted_filter_array = invert_boolean_array(filter_array)?;
+
+            Ok(filter_record_batch(batch, &inverted_filter_array)?)
+        })
+}
+
 pub(crate) fn batch_filter(
     batch: &RecordBatch,
     predicate: &Arc<dyn PhysicalExpr>,
@@ -347,9 +374,9 @@ pub(crate) fn batch_filter(
         .evaluate(batch)
         .and_then(|v| v.into_array(batch.num_rows()))
         .and_then(|array| {
-            Ok(as_boolean_array(&array)?)
-                // apply filter array to record batch
-                .and_then(|filter_array| Ok(filter_record_batch(batch, filter_array)?))
+            let filter_array = as_boolean_array(&array)?;
+
+            Ok(filter_record_batch(batch, &filter_array)?)
         })
 }
 
@@ -366,7 +393,7 @@ impl Stream for FilterExecStream {
                 Poll::Ready(value) => match value {
                     Some(Ok(batch)) => {
                         let timer = self.baseline_metrics.elapsed_compute().timer();
-                        let filtered_batch = batch_filter(&batch, &self.predicate)?;
+                        let filtered_batch = _batch_filter_negative(&batch, &self.predicate)?;
                         // skip entirely filtered batches
                         if filtered_batch.num_rows() == 0 {
                             continue;

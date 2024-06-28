@@ -912,7 +912,6 @@ impl DataFrame {
     /// ```
     pub async fn show(self) -> Result<()> {
         let results = self.collect().await?;
-        println!("Results compiled {:#?}", results);
         Ok(pretty::print_batches(&results)?)
     }
 

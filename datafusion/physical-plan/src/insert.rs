@@ -155,7 +155,7 @@ impl DataSinkExec {
             Ok(Box::pin(RecordBatchStreamAdapter::new(
                 self.sink_schema.clone(),
                 input_stream
-                    .map(move |batch| check_not_null_contraits(batch?, &risky_columns)),
+                    .map(move |batch| check_not_null_contraints(batch?, &risky_columns)),
             )))
         }
     }
@@ -315,7 +315,7 @@ pub fn make_count_schema() -> SchemaRef {
     )]))
 }
 
-fn check_not_null_contraits(
+fn check_not_null_contraints(
     batch: RecordBatch,
     column_indices: &Vec<usize>,
 ) -> Result<RecordBatch> {

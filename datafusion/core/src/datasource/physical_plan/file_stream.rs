@@ -260,7 +260,11 @@ impl<F: FileOpener> FileStream<F> {
                 .collect::<Vec<_>>(),
         );
 
-        let files = config.file_groups[partition].clone();
+        let files = if config.file_groups.len() > 0 {
+            config.file_groups[partition].clone()
+        } else {
+            vec![]
+        };
 
         Ok(Self {
             file_iter: files.into(),

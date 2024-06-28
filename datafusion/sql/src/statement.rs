@@ -166,7 +166,6 @@ impl<'a, S: ContextProvider> SqlToRel<'a, S> {
                 statement,
             }) => self.explain_to_plan(verbose, analyze, *statement),
         };
-        println!("Exiting statement_to_plan function");
         return plan;
     }
 
@@ -176,7 +175,6 @@ impl<'a, S: ContextProvider> SqlToRel<'a, S> {
             statement,
             &mut PlannerContext::new(),
         );
-        println!("Exiting sql_statement_to_plan function");
         return plan;
     }
 
@@ -535,7 +533,6 @@ impl<'a, S: ContextProvider> SqlToRel<'a, S> {
                 selection,
                 returning,
             } => {
-                println!("UPDATE statement reached here");
                 if returning.is_some() {
                     plan_err!("Update-returning clause not yet supported")?;
                 }
@@ -1207,7 +1204,9 @@ impl<'a, S: ContextProvider> SqlToRel<'a, S> {
                     &[&[&schema]],
                     &[using_columns],
                 )?;
-                LogicalPlan::Filter(Filter::try_new(filter_expr, Arc::new(scan))?)
+                LogicalPlan::Filter(
+                    Filter::try_new(filter_expr, Arc::new(scan))?
+                )
             }
         };
 
@@ -1227,7 +1226,6 @@ impl<'a, S: ContextProvider> SqlToRel<'a, S> {
         from: Option<TableWithJoins>,
         predicate_expr: Option<Expr>,
     ) -> Result<LogicalPlan> {
-        println!("Inside update to plan function");
         let (table_name, table_alias) = match &table.relation {
             TableFactor::Table { name, alias, .. } => (name.clone(), alias.clone()),
             _ => plan_err!("Cannot update non-table relation!")?,
@@ -1330,7 +1328,6 @@ impl<'a, S: ContextProvider> SqlToRel<'a, S> {
             WriteOp::Update,
             Arc::new(source),
         ));
-        println!("Exiting update to plan function");
         Ok(plan)
     }
 
