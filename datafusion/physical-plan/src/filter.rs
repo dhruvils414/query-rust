@@ -32,15 +32,15 @@ use crate::{
     DisplayFormatType, ExecutionPlan,
 };
 
+use arrow_array::BooleanArray;
 use arrow::compute::filter_record_batch;
 use arrow::datatypes::{DataType, SchemaRef};
 use arrow::record_batch::RecordBatch;
-use arrow_array::BooleanArray;
 use datafusion_common::cast::as_boolean_array;
 use datafusion_common::stats::Precision;
 use datafusion_common::{plan_err, DataFusionError, Result};
 use datafusion_execution::TaskContext;
-use datafusion_expr::Operator;
+use datafusion_expr::{Operator, FilterOp};
 use datafusion_physical_expr::expressions::BinaryExpr;
 use datafusion_physical_expr::intervals::utils::check_support;
 use datafusion_physical_expr::utils::collect_columns;
@@ -57,6 +57,7 @@ use log::trace;
 pub struct FilterExec {
     /// The expression to filter on. This expression must evaluate to a boolean value.
     predicate: Arc<dyn PhysicalExpr>,
+    filter_op: FilterOp,
     /// The input plan
     input: Arc<dyn ExecutionPlan>,
     /// Execution metrics
@@ -71,6 +72,7 @@ impl FilterExec {
     pub fn try_new(
         predicate: Arc<dyn PhysicalExpr>,
         input: Arc<dyn ExecutionPlan>,
+        filter_op: FilterOp,
     ) -> Result<Self> {
         match predicate.data_type(input.schema().as_ref())? {
             DataType::Boolean => {
@@ -80,6 +82,7 @@ impl FilterExec {
                 Ok(Self {
                     predicate,
                     input: input.clone(),
+                    filter_op,
                     metrics: ExecutionPlanMetricsSet::new(),
                     default_selectivity,
                     cache,
@@ -256,7 +259,7 @@ impl ExecutionPlan for FilterExec {
         self: Arc<Self>,
         mut children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        FilterExec::try_new(self.predicate.clone(), children.swap_remove(0))
+        FilterExec::try_new(self.predicate.clone(), children.swap_remove(0), self.filter_op)
             .and_then(|e| {
                 let selectivity = e.default_selectivity();
                 e.with_default_selectivity(selectivity)
@@ -276,6 +279,7 @@ impl ExecutionPlan for FilterExec {
             predicate: self.predicate.clone(),
             input: self.input.execute(partition, context)?,
             baseline_metrics,
+            filter_op: self.filter_op,
         }))
     }
 
@@ -338,32 +342,8 @@ struct FilterExecStream {
     input: SendableRecordBatchStream,
     /// runtime metrics recording
     baseline_metrics: BaselineMetrics,
-}
-
-pub(crate) fn invert_boolean_array(boolean_array: &BooleanArray) -> Result<BooleanArray> {
-    let mut builder = BooleanArray::builder(boolean_array.len());
-
-    for i in 0..boolean_array.len() {
-        builder.append_value(!boolean_array.value(i));
-    }
-
-    Ok(builder.finish())
-}
-
-pub(crate) fn _batch_filter_negative(
-    batch: &RecordBatch,
-    predicate: &Arc<dyn PhysicalExpr>,
-) -> Result<RecordBatch> {
-    predicate
-        .evaluate(batch)
-        .and_then(|v| v.into_array(batch.num_rows()))
-        .and_then(|array| {
-            let filter_array = as_boolean_array(&array)?;
-
-            let inverted_filter_array = invert_boolean_array(filter_array)?;
-
-            Ok(filter_record_batch(batch, &inverted_filter_array)?)
-        })
+    /// filter operator
+    filter_op: FilterOp
 }
 
 pub(crate) fn batch_filter(
@@ -380,6 +360,33 @@ pub(crate) fn batch_filter(
         })
 }
 
+
+pub(crate) fn invert_boolean_array(boolean_array: &BooleanArray) -> Result<BooleanArray> {
+    let mut builder = BooleanArray::builder(boolean_array.len());
+
+    for i in 0..boolean_array.len() {
+        builder.append_value(!boolean_array.value(i));
+    }
+
+    Ok(builder.finish())
+}
+
+pub(crate) fn batch_filter_negative(
+    batch: &RecordBatch,
+    predicate: &Arc<dyn PhysicalExpr>,
+) -> Result<RecordBatch> {
+    predicate
+        .evaluate(batch)
+        .and_then(|v| v.into_array(batch.num_rows()))
+        .and_then(|array| {
+            let filter_array = as_boolean_array(&array)?;
+
+            let inverted_filter_array = invert_boolean_array(filter_array)?;
+
+            Ok(filter_record_batch(batch, &inverted_filter_array)?)
+        })
+}
+
 impl Stream for FilterExecStream {
     type Item = Result<RecordBatch>;
 
@@ -393,7 +400,10 @@ impl Stream for FilterExecStream {
                 Poll::Ready(value) => match value {
                     Some(Ok(batch)) => {
                         let timer = self.baseline_metrics.elapsed_compute().timer();
-                        let filtered_batch = _batch_filter_negative(&batch, &self.predicate)?;
+                        let filtered_batch = match self.filter_op {
+                            FilterOp::Filter | FilterOp:: Update => batch_filter(&batch, &self.predicate)?,
+                            FilterOp::Delete => batch_filter_negative(&batch, &self.predicate)?,
+                        };
                         // skip entirely filtered batches
                         if filtered_batch.num_rows() == 0 {
                             continue;
@@ -429,7 +439,7 @@ impl RecordBatchStream for FilterExecStream {
 }
 
 /// Return the equals Column-Pairs and Non-equals Column-Pairs
-fn collect_columns_from_predicate(predicate: &Arc<dyn PhysicalExpr>) -> EqualAndNonEqual {
+pub fn collect_columns_from_predicate(predicate: &Arc<dyn PhysicalExpr>) -> EqualAndNonEqual {
     let mut eq_predicate_columns = Vec::<PhysicalExprPairRef>::new();
     let mut ne_predicate_columns = Vec::<PhysicalExprPairRef>::new();
 

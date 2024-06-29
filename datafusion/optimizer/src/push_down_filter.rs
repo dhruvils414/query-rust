@@ -665,9 +665,10 @@ impl OptimizerRule for PushDownFilter {
                 let new_predicate = conjunction(new_predicates).ok_or_else(|| {
                     plan_datafusion_err!("at least one expression exists")
                 })?;
-                let new_filter = LogicalPlan::Filter(Filter::try_new(
+                let new_filter = LogicalPlan::Filter(Filter::try_new_with_op(
                     new_predicate,
                     child_filter.input.clone(),
+                    child_filter.filter_op
                 )?);
                 self.rewrite(new_filter, _config)?.data
             }
@@ -694,9 +695,10 @@ impl OptimizerRule for PushDownFilter {
                 }
                 let new_predicate =
                     replace_cols_by_name(filter.predicate.clone(), &replace_map)?;
-                let new_filter = LogicalPlan::Filter(Filter::try_new(
+                let new_filter = LogicalPlan::Filter(Filter::try_new_with_op(
                     new_predicate,
                     subquery_alias.input.clone(),
+                    filter.filter_op
                 )?);
                 child_plan.with_new_exprs(child_plan.expressions(), vec![new_filter])?
             }
@@ -735,9 +737,10 @@ impl OptimizerRule for PushDownFilter {
                     Some(expr) => {
                         // re-write all filters based on this projection
                         // E.g. in `Filter: b\n  Projection: a > 1 as b`, we can swap them, but the filter must be "a > 1"
-                        let new_filter = LogicalPlan::Filter(Filter::try_new(
+                        let new_filter = LogicalPlan::Filter(Filter::try_new_with_op(
                             replace_cols_by_name(expr, &non_volatile_map)?,
                             projection.input.clone(),
+                            filter.filter_op
                         )?);
 
                         match conjunction(keep_predicates) {
@@ -750,9 +753,10 @@ impl OptimizerRule for PushDownFilter {
                                     child_plan.expressions(),
                                     vec![new_filter],
                                 )?;
-                                LogicalPlan::Filter(Filter::try_new(
+                                LogicalPlan::Filter(Filter::try_new_with_op(
                                     keep_predicate,
                                     Arc::new(child_plan),
+                                    filter.filter_op
                                 )?)
                             }
                         }
@@ -775,9 +779,10 @@ impl OptimizerRule for PushDownFilter {
 
                     let push_predicate =
                         replace_cols_by_name(filter.predicate.clone(), &replace_map)?;
-                    inputs.push(Arc::new(LogicalPlan::Filter(Filter::try_new(
+                    inputs.push(Arc::new(LogicalPlan::Filter(Filter::try_new_with_op(
                         push_predicate,
                         input.clone(),
+                        filter.filter_op
                     )?)))
                 }
                 LogicalPlan::Union(Union {
@@ -819,9 +824,10 @@ impl OptimizerRule for PushDownFilter {
                     .collect::<Result<Vec<_>>>()?;
 
                 let child = match conjunction(replaced_push_predicates) {
-                    Some(predicate) => LogicalPlan::Filter(Filter::try_new(
+                    Some(predicate) => LogicalPlan::Filter(Filter::try_new_with_op(
                         predicate,
                         agg.input.clone(),
+                        filter.filter_op
                     )?),
                     None => (*agg.input).clone(),
                 };
@@ -829,9 +835,10 @@ impl OptimizerRule for PushDownFilter {
                     .input
                     .with_new_exprs(filter.input.expressions(), vec![child])?;
                 match conjunction(keep_predicates) {
-                    Some(predicate) => LogicalPlan::Filter(Filter::try_new(
+                    Some(predicate) => LogicalPlan::Filter(Filter::try_new_with_op(
                         predicate,
                         Arc::new(new_agg),
+                        filter.filter_op
                     )?),
                     None => new_agg,
                 }
@@ -902,9 +909,10 @@ impl OptimizerRule for PushDownFilter {
                 });
 
                 match conjunction(new_predicate) {
-                    Some(predicate) => LogicalPlan::Filter(Filter::try_new(
+                    Some(predicate) => LogicalPlan::Filter(Filter::try_new_with_op(
                         predicate,
                         Arc::new(new_scan),
+                        filter.filter_op
                     )?),
                     None => new_scan,
                 }
@@ -932,9 +940,10 @@ impl OptimizerRule for PushDownFilter {
                         .inputs()
                         .into_iter()
                         .map(|child| {
-                            Ok(LogicalPlan::Filter(Filter::try_new(
+                            Ok(LogicalPlan::Filter(Filter::try_new_with_op(
                                 predicate.clone(),
                                 Arc::new(child.clone()),
+                                filter.filter_op
                             )?))
                         })
                         .collect::<Result<Vec<_>>>()?,
@@ -945,9 +954,10 @@ impl OptimizerRule for PushDownFilter {
                     child_plan.with_new_exprs(child_plan.expressions(), new_children)?;
 
                 match conjunction(keep_predicates) {
-                    Some(predicate) => LogicalPlan::Filter(Filter::try_new(
+                    Some(predicate) => LogicalPlan::Filter(Filter::try_new_with_op(
                         predicate,
                         Arc::new(new_extension),
+                        filter.filter_op
                     )?),
                     None => new_extension,
                 }
@@ -996,7 +1006,7 @@ fn convert_to_cross_join_if_beneficial(plan: LogicalPlan) -> Result<LogicalPlan>
     } else if let LogicalPlan::Filter(filter) = &plan {
         let new_input =
             convert_to_cross_join_if_beneficial(filter.input.as_ref().clone())?;
-        return Filter::try_new(filter.predicate.clone(), Arc::new(new_input))
+        return Filter::try_new_with_op(filter.predicate.clone(), Arc::new(new_input), filter.filter_op)
             .map(LogicalPlan::Filter);
     }
     Ok(plan)

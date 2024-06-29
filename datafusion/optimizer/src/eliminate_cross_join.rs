@@ -24,7 +24,7 @@ use crate::{utils, OptimizerConfig, OptimizerRule};
 use datafusion_common::{plan_err, Result};
 use datafusion_expr::expr::{BinaryExpr, Expr};
 use datafusion_expr::logical_plan::{
-    CrossJoin, Filter, Join, JoinConstraint, JoinType, LogicalPlan, Projection,
+    CrossJoin, Filter, FilterOp, Join, JoinConstraint, JoinType, LogicalPlan, Projection,
 };
 use datafusion_expr::utils::{can_hash, find_valid_equijoin_key_pair};
 use datafusion_expr::{build_join_schema, ExprSchemable, Operator};
@@ -56,10 +56,12 @@ impl OptimizerRule for EliminateCrossJoin {
         config: &dyn OptimizerConfig,
     ) -> Result<Option<LogicalPlan>> {
         let mut possible_join_keys: Vec<(Expr, Expr)> = vec![];
+        let mut filter_op = FilterOp::Filter;
         let mut all_inputs: Vec<LogicalPlan> = vec![];
         let parent_predicate = match plan {
             LogicalPlan::Filter(filter) => {
                 let input = filter.input.as_ref();
+                filter_op = filter.filter_op.clone();
                 match input {
                     LogicalPlan::Join(Join {
                         join_type: JoinType::Inner,
@@ -127,12 +129,12 @@ impl OptimizerRule for EliminateCrossJoin {
 
         // If there are no join keys then do nothing:
         if all_join_keys.is_empty() {
-            Filter::try_new(predicate.clone(), Arc::new(left))
+            Filter::try_new_with_op(predicate.clone(), Arc::new(left), filter_op)
                 .map(|f| Some(LogicalPlan::Filter(f)))
         } else {
             // Remove join expressions from filter:
             match remove_join_expressions(predicate, &all_join_keys)? {
-                Some(filter_expr) => Filter::try_new(filter_expr, Arc::new(left))
+                Some(filter_expr) => Filter::try_new_with_op(filter_expr, Arc::new(left), filter_op)
                     .map(|f| Some(LogicalPlan::Filter(f))),
                 _ => Ok(Some(left)),
             }

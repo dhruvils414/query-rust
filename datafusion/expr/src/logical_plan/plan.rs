@@ -505,7 +505,7 @@ impl LogicalPlan {
                 // todo it isn't clear why the schema is not recomputed here
                 Ok(LogicalPlan::Values(Values { schema, values }))
             }
-            LogicalPlan::Filter(Filter { predicate, input }) => {
+            LogicalPlan::Filter(Filter { predicate, input, filter_op }) => {
                 // todo: should this logic be moved to Filter::try_new?
 
                 // filter predicates should not contain aliased expressions so we remove any aliases
@@ -539,7 +539,7 @@ impl LogicalPlan {
                     })
                     .data()?;
 
-                Filter::try_new(predicate, input).map(LogicalPlan::Filter)
+                Filter::try_new_with_op(predicate, input, filter_op).map(LogicalPlan::Filter)
             }
             LogicalPlan::Repartition(_) => Ok(self),
             LogicalPlan::Window(Window {
@@ -737,7 +737,7 @@ impl LogicalPlan {
                         .collect(),
                 }))
             }
-            LogicalPlan::Filter { .. } => {
+            LogicalPlan::Filter(Filter {filter_op, ..}) => {
                 assert_eq!(1, expr.len());
                 let predicate = expr.pop().unwrap();
 
@@ -772,7 +772,7 @@ impl LogicalPlan {
                     })
                     .data()?;
 
-                Filter::try_new(predicate, Arc::new(inputs.swap_remove(0)))
+                Filter::try_new_with_op(predicate, Arc::new(inputs.swap_remove(0)), *filter_op)
                     .map(LogicalPlan::Filter)
             }
             LogicalPlan::Repartition(Repartition {
@@ -1929,6 +1929,20 @@ impl SubqueryAlias {
     }
 }
 
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+/// Represents the type of filter operation to be performed.
+///
+/// - `Filter`: Filters rows from the input that do not match the predicate expression. To be used for a regular filter operation
+/// - `Update`: Filtered rows to be marked for update. These Updated rows in the input that match the predicate expression.
+/// - `Delete`: Filtered rows to be marked for delete. Deletes rows from the input that match the predicate expression.
+pub enum FilterOp {
+    Filter,
+    Update,
+    Delete,
+}
+
+
 /// Filters rows from its input that do not match an
 /// expression (essentially a WHERE clause with a predicate
 /// expression).
@@ -1947,6 +1961,8 @@ pub struct Filter {
     pub predicate: Expr,
     /// The incoming logical plan
     pub input: Arc<LogicalPlan>,
+    /// Filter Struct used for Operation : Filter/Update/Delete
+    pub filter_op: FilterOp,
 }
 
 impl Filter {
@@ -1973,7 +1989,26 @@ impl Filter {
             );
         }
 
-        Ok(Self { predicate, input })
+        Ok(Self { predicate, input , filter_op: FilterOp::Filter})
+    }
+
+    /// Create a new filter operator with the specified filter operation.
+    ///
+    /// This function validates that the predicate expression returns a boolean value, and
+    /// that the predicate is not aliased. It then creates a new `Filter` struct with the
+    /// provided predicate, input logical plan, and the specified filter operation.
+    ///
+    /// # Errors
+    /// Returns an error if the predicate expression does not return a boolean value, or
+    /// if the predicate is aliased.
+    pub fn try_new_with_op(predicate: Expr, input: Arc<LogicalPlan>, filter_op: FilterOp) -> Result<Self> {
+        let filter = Filter::try_new(predicate, input)?;
+
+        Ok(Self {
+            predicate: filter.predicate,
+            input: filter.input,
+            filter_op,
+        })
     }
 
     /// Is this filter guaranteed to return 0 or 1 row in a given instantiation?

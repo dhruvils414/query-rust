@@ -127,7 +127,7 @@ impl OptimizerRule for EliminateOuterJoin {
                         schema: join.schema.clone(),
                         null_equals_null: join.null_equals_null,
                     }));
-                    Filter::try_new(filter.predicate, new_join)
+                    Filter::try_new_with_op(filter.predicate, new_join, filter.filter_op)
                         .map(|f| Transformed::yes(LogicalPlan::Filter(f)))
                 }
                 _ => Ok(Transformed::no(LogicalPlan::Filter(filter))),

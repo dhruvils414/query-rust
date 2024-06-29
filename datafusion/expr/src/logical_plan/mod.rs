@@ -36,7 +36,7 @@ pub use ddl::{
 pub use dml::{DmlStatement, WriteOp};
 pub use plan::{
     projection_schema, Aggregate, Analyze, CrossJoin, DescribeTable, Distinct,
-    DistinctOn, EmptyRelation, Explain, Extension, Filter, Join, JoinConstraint,
+    DistinctOn, EmptyRelation, Explain, Extension, Filter, FilterOp, Join, JoinConstraint,
     JoinType, Limit, LogicalPlan, Partitioning, PlanType, Prepare, Projection,
     RecursiveQuery, Repartition, Sort, StringifiedPlan, Subquery, SubqueryAlias,
     TableScan, ToStringifiedPlan, Union, Unnest, Values, Window,

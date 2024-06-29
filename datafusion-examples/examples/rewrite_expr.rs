@@ -95,11 +95,12 @@ impl MyAnalyzerRule {
             Ok(match plan {
                 LogicalPlan::Filter(filter) => {
                     let predicate = Self::analyze_expr(filter.predicate.clone())?;
-                    Transformed::yes(LogicalPlan::Filter(Filter::try_new(
+                    Transformed::yes(LogicalPlan::Filter(Filter::try_new_with_op(
                         predicate,
                         filter.input,
+                        filter.filter_op
                     )?))
-                }
+                },
                 _ => Transformed::no(plan),
             })
         })
@@ -141,20 +142,22 @@ impl OptimizerRule for MyOptimizerRule {
         match optimized_plan {
             Some(LogicalPlan::Filter(filter)) => {
                 let predicate = my_rewrite(filter.predicate.clone())?;
-                Ok(Some(LogicalPlan::Filter(Filter::try_new(
+                Ok(Some(LogicalPlan::Filter(Filter::try_new_with_op(
                     predicate,
                     filter.input,
+                    filter.filter_op
                 )?)))
-            }
+            },
             Some(optimized_plan) => Ok(Some(optimized_plan)),
             None => match plan {
                 LogicalPlan::Filter(filter) => {
                     let predicate = my_rewrite(filter.predicate.clone())?;
-                    Ok(Some(LogicalPlan::Filter(Filter::try_new(
+                    Ok(Some(LogicalPlan::Filter(Filter::try_new_with_op(
                         predicate,
                         filter.input.clone(),
+                        filter.filter_op
                     )?)))
-                }
+                },
                 _ => Ok(None),
             },
         }

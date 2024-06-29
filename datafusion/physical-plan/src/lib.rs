@@ -54,6 +54,7 @@ pub mod explain;
 pub mod filter;
 pub mod insert;
 pub mod upsert;
+pub mod delete;
 pub mod joins;
 pub mod limit;
 pub mod memory;

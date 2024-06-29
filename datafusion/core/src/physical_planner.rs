@@ -1124,7 +1124,7 @@ impl DefaultPhysicalPlanner {
                     expr,
                 )?,
             LogicalPlan::Filter(Filter {
-                predicate, input, ..
+                predicate, input, filter_op, ..
             }) => {
                 let physical_input = children.one()?;
                 let input_dfschema = input.schema();
@@ -1136,9 +1136,10 @@ impl DefaultPhysicalPlanner {
                     .options()
                     .optimizer
                     .default_filter_selectivity;
-                let filter = FilterExec::try_new(runtime_expr, physical_input)?;
+                let filter = FilterExec::try_new(runtime_expr, physical_input, *filter_op)?;
+
                 Arc::new(filter.with_default_selectivity(selectivity)?)
-            }
+            },
             LogicalPlan::Repartition(Repartition {
                 input,
                 partitioning_scheme,

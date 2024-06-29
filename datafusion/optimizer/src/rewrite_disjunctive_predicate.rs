@@ -163,9 +163,10 @@ impl OptimizerRule for RewriteDisjunctivePredicate {
                 let predicate = predicate(filter.predicate)?;
                 let rewritten_predicate = rewrite_predicate(predicate);
                 let rewritten_expr = normalize_predicate(rewritten_predicate);
-                Ok(Transformed::yes(LogicalPlan::Filter(Filter::try_new(
+                Ok(Transformed::yes(LogicalPlan::Filter(Filter::try_new_with_op(
                     rewritten_expr,
                     filter.input,
+                    filter.filter_op
                 )?)))
             }
             _ => Ok(Transformed::no(plan)),

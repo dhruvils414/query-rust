@@ -1,5 +1,4 @@
 use std::any::Any;
-use std::fmt::Debug;
 use std::fmt;
 use std::sync::Arc;
 
@@ -10,7 +9,6 @@ use super::{
 use crate::metrics::MetricsSet;
 use crate::stream::RecordBatchStreamAdapter;
 use crate::CoalescePartitionsExec;
-use crate::projection::ProjectionExec;
 use crate::coalesce_batches::CoalesceBatchesExec;
 
 use arrow::datatypes::SchemaRef;
@@ -18,50 +16,18 @@ use arrow::record_batch::RecordBatch;
 use arrow_array::{ArrayRef, UInt64Array};
 use datafusion_common::{exec_err, internal_err, Result};
 use datafusion_execution::TaskContext;
-use datafusion_physical_expr::{Distribution, PhysicalSortRequirement, EquivalenceProperties, PhysicalExpr};
+use datafusion_physical_expr::{Distribution, PhysicalSortRequirement, EquivalenceProperties};
 use crate::insert::make_count_schema;
 use crate::filter::FilterExec;
 
+use crate::upsert::OverwriteSink;
+
 use futures::StreamExt;
-use async_trait::async_trait;
-
-/// `OverwriteSink` implements updating streams of [`RecordBatch`]es in
-/// user defined destinations.
-///
-/// The `Display` impl is used to format the sink for explain plan
-/// output.
-#[async_trait]
-pub trait OverwriteSink: DisplayAs + Debug + Send + Sync {
-    /// Returns the data sink as [`Any`](std::any::Any) so that it can be
-    /// downcast to a specific implementation.
-    fn as_any(&self) -> &dyn Any;
-
-    /// Return a snapshot of the [MetricsSet] for this
-    /// [OverwriteSink].
-    ///
-    /// See [ExecutionPlan::metrics()] for more details
-    fn metrics(&self) -> Option<MetricsSet>;
-
-    // TODO add desired input ordering
-    // How does this sink want its input ordered?
-
-    /// Writes the data to the sink, returns the number of values written
-    ///
-    /// This method will be called exactly once during each DML
-    /// statement. Thus prior to return, the sink should do any commit
-    /// or rollback required.
-    async fn overwrite_with(
-        &self,
-        data: SendableRecordBatchStream,
-        context: &Arc<TaskContext>,
-        filter: Option<Arc<dyn PhysicalExpr>>,
-    ) -> Result<u64>;
-}
 
 /// Execution plan for updating record batches to a [`OverwriteSink`]
 ///
 /// Returns a single row with the number of values updated
-pub struct UpdateSinkExec {
+pub struct DeleteSinkExec {
     /// Input plan that produces the record batches to be updated.
     input: Arc<dyn ExecutionPlan>,
     /// Sink to which to update
@@ -75,13 +41,13 @@ pub struct UpdateSinkExec {
     cache: PlanProperties,
 }
 
-impl fmt::Debug for UpdateSinkExec {
+impl fmt::Debug for DeleteSinkExec {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "UpdateSinkExec schema: {:?}", self.count_schema)
+        write!(f, "DeleteSinkExec schema: {:?}", self.count_schema)
     }
 }
 
-impl UpdateSinkExec {
+impl DeleteSinkExec {
     /// Create a plan to update the `sink`
     pub fn new(
         input: Arc<dyn ExecutionPlan>,
@@ -174,7 +140,7 @@ impl UpdateSinkExec {
     }
 }
 
-impl DisplayAs for UpdateSinkExec {
+impl DisplayAs for DeleteSinkExec {
     fn fmt_as(
         &self,
         t: DisplayFormatType,
@@ -182,14 +148,14 @@ impl DisplayAs for UpdateSinkExec {
     ) -> std::fmt::Result {
         match t {
             DisplayFormatType::Default | DisplayFormatType::Verbose => {
-                write!(f, "UpdateSinkExec: sink=")?;
+                write!(f, "DeleteSinkExec sink=")?;
                 self.sink.fmt_as(t, f)
             }
         }
     }
 }
 
-impl ExecutionPlan for UpdateSinkExec {
+impl ExecutionPlan for DeleteSinkExec {
     /// Return a reference to Any that can be used for downcasting
     fn as_any(&self) -> &dyn Any {
         self
@@ -257,15 +223,13 @@ impl ExecutionPlan for UpdateSinkExec {
         context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream> {
         if partition != 0 {
-            return internal_err!("UpdateSinkExec can only be called on partition 0!");
+            return internal_err!("DeleteSinkExec can only be called on partition 0!");
         }
 
         let data = self.execute_input_stream(0, context.clone())?;
-        // NOTE :: This data stream that contains the output rows from the filterExec
 
         let filter_predicate = if let Some(coalesce_partition_exec) = self.input.as_any().downcast_ref::<CoalescePartitionsExec>() {
-            let project_exec = coalesce_partition_exec.input().as_any().downcast_ref::<ProjectionExec>().unwrap();
-            let coalesce_batch_exec = project_exec.input().as_any().downcast_ref::<CoalesceBatchesExec>().unwrap();
+            let coalesce_batch_exec = coalesce_partition_exec.input().as_any().downcast_ref::<CoalesceBatchesExec>().unwrap();
 
             let filter_exec = coalesce_batch_exec.input().as_any().downcast_ref::<FilterExec>().unwrap();
 

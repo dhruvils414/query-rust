@@ -46,7 +46,7 @@ use datafusion_expr::{
     cast, col, Analyze, CreateCatalog, CreateCatalogSchema,
     CreateExternalTable as PlanCreateExternalTable, CreateFunction, CreateFunctionBody,
     CreateMemoryTable, CreateView, DescribeTable, DmlStatement, DropCatalogSchema,
-    DropFunction, DropTable, DropView, EmptyRelation, Explain, ExprSchemable, Filter,
+    DropFunction, DropTable, DropView, EmptyRelation, Explain, ExprSchemable, Filter, FilterOp,
     LogicalPlan, LogicalPlanBuilder, OperateFunctionArg, PlanType, Prepare, SetVariable,
     Statement as PlanStatement, ToStringifiedPlan, TransactionAccessMode,
     TransactionConclusion, TransactionEnd, TransactionIsolationLevel, TransactionStart,
@@ -1205,7 +1205,7 @@ impl<'a, S: ContextProvider> SqlToRel<'a, S> {
                     &[using_columns],
                 )?;
                 LogicalPlan::Filter(
-                    Filter::try_new(filter_expr, Arc::new(scan))?
+                    Filter::try_new_with_op(filter_expr, Arc::new(scan), FilterOp::Delete)?
                 )
             }
         };
@@ -1276,7 +1276,7 @@ impl<'a, S: ContextProvider> SqlToRel<'a, S> {
                     &[&[scan.schema()]],
                     &[using_columns],
                 )?;
-                LogicalPlan::Filter(Filter::try_new(filter_expr, Arc::new(scan))?)
+                LogicalPlan::Filter(Filter::try_new_with_op(filter_expr, Arc::new(scan), FilterOp::Update)?)
             }
         };
 

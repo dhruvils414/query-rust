@@ -34,6 +34,7 @@ use crate::physical_plan::joins::{
     CrossJoinExec, HashJoinExec, NestedLoopJoinExec, SortMergeJoinExec,
     SymmetricHashJoinExec,
 };
+use crate::logical_expr::FilterOp;
 use crate::physical_plan::memory::MemoryExec;
 use crate::physical_plan::projection::ProjectionExec;
 use crate::physical_plan::repartition::RepartitionExec;
@@ -398,7 +399,7 @@ fn try_swapping_with_filter(
         return Ok(None);
     };
 
-    FilterExec::try_new(new_predicate, make_with_child(projection, filter.input())?)
+    FilterExec::try_new(new_predicate, make_with_child(projection, filter.input())?, FilterOp::Filter)
         .and_then(|e| {
             let selectivity = filter.default_selectivity();
             e.with_default_selectivity(selectivity)
