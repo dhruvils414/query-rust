@@ -79,7 +79,7 @@ impl DeleteSinkExec {
         )
     }
 
-    fn execute_input_stream(
+    pub fn execute_input_stream(
         &self,
         partition: usize,
         context: Arc<TaskContext>,

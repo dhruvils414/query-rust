@@ -33,6 +33,7 @@ use super::{
     ExecutionPlanProperties, Partitioning, PlanProperties, RecordBatchStream,
     SendableRecordBatchStream, Statistics,
 };
+use crate::stream::RecordBatchStreamAdapter;
 use crate::metrics::BaselineMetrics;
 use crate::stream::ObservedStream;
 
@@ -248,9 +249,9 @@ impl ExecutionPlan for UnionExec {
         for input in self.inputs.iter() {
             // Calculate whether partition belongs to the current partition
             if partition < input.output_partitioning().partition_count() {
-                let stream = input.execute(partition, context)?;
+                let stream = input.execute(partition, context.clone())?;
                 debug!("Found a Union partition to execute");
-                return Ok(Box::pin(ObservedStream::new(stream, baseline_metrics)));
+                return Ok(Box::pin(ObservedStream::new(stream, baseline_metrics.clone())));
             } else {
                 partition -= input.output_partitioning().partition_count();
             }
@@ -258,7 +259,19 @@ impl ExecutionPlan for UnionExec {
 
         warn!("Error in Union: Partition {} not found", partition);
 
-        exec_err!("Partition {partition} not found in Union")
+        warn!("Partition {partition} not found in Union");
+
+        // return empty batch stream
+        Ok(Box::pin(ObservedStream::new(
+            // an empty RecordBatchStream
+            Box::pin(RecordBatchStreamAdapter::new(
+                self.inputs[0].schema().clone(),
+                // empty stream
+                Box::pin(futures::stream::empty()),
+            )),
+            baseline_metrics,
+        )))
+
     }
 
     fn metrics(&self) -> Option<MetricsSet> {

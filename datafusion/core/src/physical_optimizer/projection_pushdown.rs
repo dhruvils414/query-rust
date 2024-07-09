@@ -2113,7 +2113,7 @@ mod tests {
             )),
         ));
         let filter: Arc<dyn ExecutionPlan> =
-            Arc::new(FilterExec::try_new(predicate, csv)?);
+            Arc::new(FilterExec::try_new(predicate, csv, FilterOp::Filter)?);
         let projection: Arc<dyn ExecutionPlan> = Arc::new(ProjectionExec::try_new(
             vec![
                 (Arc::new(Column::new("a", 0)), "a_new".to_string()),

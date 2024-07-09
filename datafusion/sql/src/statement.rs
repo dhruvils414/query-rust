@@ -43,7 +43,7 @@ use datafusion_expr::logical_plan::builder::project;
 use datafusion_expr::logical_plan::DdlStatement;
 use datafusion_expr::utils::expr_to_columns;
 use datafusion_expr::{
-    cast, col, Analyze, CreateCatalog, CreateCatalogSchema,
+    cast, col, Union, Analyze, CreateCatalog, CreateCatalogSchema,
     CreateExternalTable as PlanCreateExternalTable, CreateFunction, CreateFunctionBody,
     CreateMemoryTable, CreateView, DescribeTable, DmlStatement, DropCatalogSchema,
     DropFunction, DropTable, DropView, EmptyRelation, Explain, ExprSchemable, Filter, FilterOp,
@@ -1234,6 +1234,7 @@ impl<'a, S: ContextProvider> SqlToRel<'a, S> {
         // Do a table lookup to verify the table exists
         let table_name = self.object_name_to_table_reference(table_name)?;
         let table_source = self.context_provider.get_table_source(table_name.clone())?;
+
         let table_schema = Arc::new(DFSchema::try_from_qualified_schema(
             table_name.clone(),
             &table_source.schema(),
@@ -1261,8 +1262,11 @@ impl<'a, S: ContextProvider> SqlToRel<'a, S> {
         let scan = self.plan_from_tables(input_tables, &mut planner_context)?;
 
         // Filter
-        let source = match predicate_expr {
-            None => scan,
+        let source = match predicate_expr.clone() {
+            None => {
+                println!("NO FILTER PREDICATE");
+                scan.clone()
+            },
             Some(predicate_expr) => {
                 let filter_expr = self.sql_to_expr(
                     predicate_expr,
@@ -1276,7 +1280,7 @@ impl<'a, S: ContextProvider> SqlToRel<'a, S> {
                     &[&[scan.schema()]],
                     &[using_columns],
                 )?;
-                LogicalPlan::Filter(Filter::try_new_with_op(filter_expr, Arc::new(scan), FilterOp::Update)?)
+                LogicalPlan::Filter(Filter::try_new_with_op(filter_expr, Arc::new(scan.clone()), FilterOp::Update)?)
             }
         };
 
@@ -1322,13 +1326,35 @@ impl<'a, S: ContextProvider> SqlToRel<'a, S> {
 
         let source = project(source, exprs)?;
 
-        let plan = LogicalPlan::Dml(DmlStatement::new(
+        let update_source = match predicate_expr.clone() {
+            None => source,
+            Some(predicate_expr) => {
+                let filter_expr =
+                    self.sql_to_expr(predicate_expr, scan.schema(), &mut planner_context)?;
+                let mut using_columns = HashSet::new();
+                expr_to_columns(&filter_expr, &mut using_columns)?;
+                let filter_expr = normalize_col_with_schemas_and_ambiguity_check(
+                    filter_expr,
+                    &[&[scan.schema()]],
+                    &[using_columns],
+                )?;
+                let prune_source = LogicalPlan::Filter(
+                    Filter::try_new_with_op(filter_expr, Arc::new(scan), FilterOp::Delete)?
+                );
+
+                LogicalPlan::Union(Union {
+                    inputs: vec![Arc::new(source), Arc::new(prune_source)],
+                    schema: table_schema.clone()
+                })
+            }
+        };
+
+        Ok(LogicalPlan::Dml(DmlStatement::new(
             table_name,
-            table_schema,
+            table_schema.clone(),
             WriteOp::Update,
-            Arc::new(source),
-        ));
-        Ok(plan)
+            Arc::new(update_source),
+        )))
     }
 
     fn insert_to_plan(

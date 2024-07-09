@@ -286,7 +286,7 @@ pub trait TableProvider: Sync + Send {
     async fn update_table(
         &self,
         _state: &SessionState,
-        _input: Arc<dyn ExecutionPlan>,
+        _input_plan: Arc<dyn ExecutionPlan>,
         _overwrite: bool,
     ) -> Result<Arc<dyn ExecutionPlan>> {
         not_impl_err!("Update table not implemented for this table")

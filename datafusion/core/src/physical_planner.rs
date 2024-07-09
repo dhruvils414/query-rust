@@ -922,8 +922,13 @@ impl DefaultPhysicalPlanner {
                 let schema = session_state.schema_for_ref(table_name.clone())?;
                 if let Some(provider) = schema.table(name).await? {
                     let update_exec = children.one()?;
+
                     provider
-                        .update_table(session_state, update_exec, false)
+                        .update_table(
+                            session_state,
+                            update_exec.clone(),
+                            false
+                        )
                         .await?
                 } else {
                     return exec_err!("Table '{table_name}' does not exist");
