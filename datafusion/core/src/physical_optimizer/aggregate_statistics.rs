@@ -313,6 +313,7 @@ pub(crate) mod tests {
     use datafusion_physical_expr::expressions::cast;
     use datafusion_physical_expr::PhysicalExpr;
     use datafusion_physical_plan::aggregates::AggregateMode;
+    use datafusion_expr::FilterOp;
 
     /// Mock data using a MemoryExec which has an exact count statistic
     fn mock_data() -> Result<Arc<MemoryExec>> {
@@ -575,6 +576,7 @@ pub(crate) mod tests {
                 &schema,
             )?,
             source,
+            FilterOp::Filter
         )?);
 
         let partial_agg = AggregateExec::try_new(
@@ -620,6 +622,7 @@ pub(crate) mod tests {
                 &schema,
             )?,
             source,
+            FilterOp::Filter
         )?);
 
         let partial_agg = AggregateExec::try_new(

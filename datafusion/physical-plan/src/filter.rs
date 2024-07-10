@@ -110,6 +110,11 @@ impl FilterExec {
         &self.predicate
     }
 
+    /// FilterOp
+    pub fn filter_op(&self) -> &FilterOp {
+        &self.filter_op
+    }
+
     /// The input plan
     pub fn input(&self) -> &Arc<dyn ExecutionPlan> {
         &self.input

@@ -1414,7 +1414,8 @@ mod tests {
             &input_schema,
         )
         .unwrap();
-        Arc::new(FilterExec::try_new(predicate, input).unwrap())
+        let filter_exec = input.as_any().downcast_ref::<FilterExec>().unwrap();
+        Arc::new(FilterExec::try_new(predicate, input.clone(), filter_exec.filter_op().clone()).unwrap())
     }
 
     fn coalesce_batches_exec(input: Arc<dyn ExecutionPlan>) -> Arc<dyn ExecutionPlan> {
