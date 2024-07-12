@@ -1264,7 +1264,6 @@ impl<'a, S: ContextProvider> SqlToRel<'a, S> {
         // Filter
         let source = match predicate_expr.clone() {
             None => {
-                println!("NO FILTER PREDICATE");
                 scan.clone()
             },
             Some(predicate_expr) => {
