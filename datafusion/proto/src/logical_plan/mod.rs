@@ -18,7 +18,7 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
-use tokio::runtime::Runtime;
+use crate::tokio::runtime::Runtime;
 
 use crate::common::proto_error;
 use crate::protobuf::logical_plan_node::LogicalPlanType::CustomScan;
@@ -146,7 +146,7 @@ pub struct TestTableProto {
 }
 
 lazy_static::lazy_static! {
-    static ref RT : Runtime = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+    static ref RT : Runtime = Runtime::new().expect("Failed to create runtime");
 }
 
 #[derive(Debug, Clone)]

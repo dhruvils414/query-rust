@@ -61,4 +61,4 @@ lazy_static = "1.5.0"
 datafusion-functions = { workspace = true, default-features = true }
 doc-comment = { workspace = true }
 strum = { version = "0.26.1", features = ["derive"] }
-tokio = { workspace = true, features = ["rt-multi-thread"] }
+tokio = { workspace = true}
