@@ -18,7 +18,7 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
-use crate::tokio::runtime::Runtime;
+use tokio::runtime::Runtime;
 
 use crate::common::proto_error;
 use crate::protobuf::logical_plan_node::LogicalPlanType::CustomScan;
