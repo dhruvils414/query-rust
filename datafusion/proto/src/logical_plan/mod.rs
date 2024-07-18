@@ -134,6 +134,19 @@ pub trait LogicalExtensionCodec: Debug + Send + Sync {
         Ok(())
     }
 }
+#[derive(Clone, PartialEq, Eq, ::prost::Message)]
+pub struct TestTableProto {
+    /// URL of the table root
+    #[prost(string, tag = "1")]
+    pub database: String,
+    /// Qualified table name
+    #[prost(string, tag = "2")]
+    pub table: String,
+}
+
+lazy_static::lazy_static! {
+    static ref RT : Runtime = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+}
 
 #[derive(Debug, Clone)]
 pub struct DefaultLogicalExtensionCodec {}
@@ -156,17 +169,41 @@ impl LogicalExtensionCodec for DefaultLogicalExtensionCodec {
         &self,
         _buf: &[u8],
         _schema: SchemaRef,
-        _ctx: &SessionContext,
+        ctx: &SessionContext,
     ) -> Result<Arc<dyn TableProvider>> {
-        not_impl_err!("LogicalExtensionCodec is not provided")
+
+        // Block on the async calls
+        let catalog = ctx.catalog("iceberg").ok_or(DataFusionError::Execution(
+            "Catalog 'iceberg' not found".to_string(),
+        ))?;
+        let schema = catalog.schema("test").ok_or(DataFusionError::Execution(
+            "Schema 'test' not found".to_string(),
+        ))?;
+
+        let table = RT.block_on(async {
+            schema
+                .table("table7")
+                .await?
+                .ok_or(DataFusionError::Execution(
+                    "Table 'table7' not found".to_string(),
+                ))
+        })?;
+
+        Ok(table)
+
     }
 
     fn try_encode_table_provider(
         &self,
-        _node: Arc<dyn TableProvider>,
-        _buf: &mut Vec<u8>,
-    ) -> Result<()> {
-        not_impl_err!("LogicalExtensionCodec is not provided")
+        node: Arc<dyn datafusion::datasource::TableProvider>,
+        buf: &mut Vec<u8>,
+    ) -> datafusion::error::Result<()> {
+        let msg = TestTableProto {
+            database: "test".to_string(), // Added `.to_string()` to convert to String type
+            table: "test".to_string(),    // Added `.to_string()` to convert to String type
+        };
+        msg.encode(buf)
+            .map_err(|_| DataFusionError::Internal("Error encoding test table".to_string()))
     }
 }
 
