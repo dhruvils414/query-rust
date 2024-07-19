@@ -273,6 +273,7 @@ pub(crate) fn replace_with_order_preserving_variants(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use datafusion_expr::FilterOp;
 
     use crate::datasource::file_format::file_compression_type::FileCompressionType;
     use crate::datasource::listing::PartitionedFile;
@@ -1414,8 +1415,7 @@ mod tests {
             &input_schema,
         )
         .unwrap();
-        let filter_exec = input.as_any().downcast_ref::<FilterExec>().unwrap();
-        Arc::new(FilterExec::try_new(predicate, input.clone(), filter_exec.filter_op().clone()).unwrap())
+        Arc::new(FilterExec::try_new(predicate, input.clone(), FilterOp::Filter).unwrap())
     }
 
     fn coalesce_batches_exec(input: Arc<dyn ExecutionPlan>) -> Arc<dyn ExecutionPlan> {

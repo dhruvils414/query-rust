@@ -43,7 +43,7 @@ use arrow_schema::{Schema, SchemaRef, SortOptions};
 use datafusion_common::tree_node::{Transformed, TransformedResult, TreeNode};
 use datafusion_common::{JoinType, Statistics};
 use datafusion_execution::object_store::ObjectStoreUrl;
-use datafusion_expr::{AggregateFunction, WindowFrame, WindowFunctionDefinition};
+use datafusion_expr::{AggregateFunction, WindowFrame, WindowFunctionDefinition, FilterOp};
 use datafusion_physical_expr::expressions::col;
 use datafusion_physical_expr::{PhysicalExpr, PhysicalSortExpr};
 use datafusion_physical_plan::displayable;
@@ -261,8 +261,7 @@ pub fn filter_exec(
     predicate: Arc<dyn PhysicalExpr>,
     input: Arc<dyn ExecutionPlan>,
 ) -> Arc<dyn ExecutionPlan> {
-    let filter_exec = input.as_any().downcast_ref::<FilterExec>().unwrap();
-    Arc::new(FilterExec::try_new(predicate, input.clone(), filter_exec.filter_op().clone()).unwrap())
+    Arc::new(FilterExec::try_new(predicate, input.clone(), FilterOp::Filter).unwrap())
 }
 
 pub fn sort_preserving_merge_exec(
