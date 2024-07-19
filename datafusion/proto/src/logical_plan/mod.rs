@@ -33,18 +33,16 @@ use crate::{
 
 use arrow::csv::WriterBuilder;
 use arrow::datatypes::{DataType, Schema, SchemaRef};
+use object_store::local::LocalFileSystem;
+use object_store::ObjectStore;
 #[cfg(feature = "parquet")]
 use datafusion::datasource::file_format::parquet::ParquetFormat;
-use datafusion::{
-    datasource::{
-        file_format::{avro::AvroFormat, csv::CsvFormat, FileFormat},
-        listing::{ListingOptions, ListingTable, ListingTableConfig, ListingTableUrl},
-        view::ViewTable,
-        TableProvider,
-    },
-    datasource::{provider_as_source, source_as_provider},
-    prelude::SessionContext,
-};
+use datafusion::{ datasource::{
+    file_format::{avro::AvroFormat, csv::CsvFormat, FileFormat},
+    listing::{ListingOptions, ListingTable, ListingTableConfig, ListingTableUrl},
+    view::ViewTable,
+    TableProvider,
+}, datasource::{provider_as_source, source_as_provider}, prelude::SessionContext};
 use datafusion_common::{
     context, internal_err, not_impl_err, parsers::CompressionTypeVariant,
     plan_datafusion_err, DataFusionError, Result, TableReference,
@@ -59,6 +57,11 @@ use datafusion_expr::{
     },
     DistinctOn, DropView, Expr, LogicalPlan, LogicalPlanBuilder, ScalarUDF,
 };
+
+use iceberg_sql_catalog::SqlCatalog;
+use iceberg_rust::catalog::identifier::Identifier;
+use iceberg_rust::catalog::Catalog;
+
 
 use prost::bytes::BufMut;
 use prost::Message;
@@ -172,6 +175,12 @@ impl LogicalExtensionCodec for DefaultLogicalExtensionCodec {
         _schema: SchemaRef,
         ctx: &SessionContext,
     ) -> Result<Arc<dyn TableProvider>> {
+
+        let object_store: Arc<dyn ObjectStore> =
+            Arc::new(LocalFileSystem::new_with_prefix("../iceberg-tests/nyc_taxis").unwrap());
+
+        let identifier = Identifier::parse("test.table1").unwrap();
+
 
         // Block on the async calls
         let catalog = ctx.catalog("iceberg").ok_or(DataFusionError::Execution(
