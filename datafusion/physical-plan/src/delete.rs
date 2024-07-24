@@ -16,6 +16,7 @@ use arrow::record_batch::RecordBatch;
 use arrow_array::{ArrayRef, UInt64Array};
 use datafusion_common::{exec_err, internal_err, Result};
 use datafusion_execution::TaskContext;
+use datafusion_expr::FilterOp;
 use datafusion_physical_expr::{Distribution, PhysicalSortRequirement, EquivalenceProperties};
 use crate::insert::make_count_schema;
 use crate::filter::FilterExec;
@@ -243,7 +244,7 @@ impl ExecutionPlan for DeleteSinkExec {
         let sink = self.sink.clone();
 
         let stream = futures::stream::once(async move {
-            sink.overwrite_with(data, &context, filter_predicate).await.map(make_count_batch)
+            sink.overwrite_with(data, &context, filter_predicate, FilterOp::Delete).await.map(make_count_batch)
         })
         .boxed();
 
