@@ -19,7 +19,7 @@ use arrow::record_batch::RecordBatch;
 use arrow_array::{ArrayRef, UInt64Array};
 use datafusion_common::{exec_err, internal_err, Result};
 use datafusion_execution::TaskContext;
-// use datafusion_expr::FilterOp;
+use datafusion_expr::FilterOp;
 use datafusion_physical_expr::{Distribution, PhysicalSortRequirement, EquivalenceProperties, PhysicalExpr};
 use crate::insert::make_count_schema;
 use crate::filter::FilterExec;
@@ -58,6 +58,7 @@ pub trait OverwriteSink: DisplayAs + Debug + Send + Sync {
         input_data: SendableRecordBatchStream,
         context: &Arc<TaskContext>,
         filter: Option<Arc<dyn PhysicalExpr>>,
+        op: FilterOp
     ) -> Result<u64>;
 }
 
@@ -289,7 +290,7 @@ impl ExecutionPlan for UpdateSinkExec {
         let sink = self.sink.clone();
 
         let stream = futures::stream::once(async move {
-            sink.overwrite_with(input_data, &context, filter_predicate).await.map(make_count_batch)
+            sink.overwrite_with(input_data, &context, filter_predicate, FilterOp::Update).await.map(make_count_batch)
         })
         .boxed();
 
