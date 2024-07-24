@@ -508,10 +508,12 @@ fn plan_update() {
     let sql = "update person set last_name='Kay' where id=1";
     let plan = r#"
 Dml: op=[Update] table=[person]
-  Projection: person.id AS id, person.first_name AS first_name, Utf8("Kay") AS last_name, person.age AS age, person.state AS state, person.salary AS salary, person.birth_date AS birth_date, person.😀 AS 😀
+  Union
+    Projection: person.id AS id, person.first_name AS first_name, Utf8("Kay") AS last_name, person.age AS age, person.state AS state, person.salary AS salary, person.birth_date AS birth_date, person.😀 AS 😀
+      Filter: person.id = Int64(1)
+        TableScan: person
     Filter: person.id = Int64(1)
-      TableScan: person
-      "#
+      TableScan: person"#
     .trim();
     quick_test(sql, plan);
 }
@@ -4134,10 +4136,12 @@ fn test_prepare_statement_update_infer() {
 
     let expected_plan = r#"
 Dml: op=[Update] table=[person]
-  Projection: person.id AS id, person.first_name AS first_name, person.last_name AS last_name, $1 AS age, person.state AS state, person.salary AS salary, person.birth_date AS birth_date, person.😀 AS 😀
+  Union
+    Projection: person.id AS id, person.first_name AS first_name, person.last_name AS last_name, $1 AS age, person.state AS state, person.salary AS salary, person.birth_date AS birth_date, person.😀 AS 😀
+      Filter: person.id = $2
+        TableScan: person
     Filter: person.id = $2
-      TableScan: person
-        "#
+      TableScan: person"#
         .trim();
 
     let expected_dt = "[Int32]";
@@ -4155,7 +4159,10 @@ Dml: op=[Update] table=[person]
         vec![ScalarValue::Int32(Some(42)), ScalarValue::UInt32(Some(1))].into();
     let expected_plan = r#"
 Dml: op=[Update] table=[person]
-  Projection: person.id AS id, person.first_name AS first_name, person.last_name AS last_name, Int32(42) AS age, person.state AS state, person.salary AS salary, person.birth_date AS birth_date, person.😀 AS 😀
+  Union
+    Projection: person.id AS id, person.first_name AS first_name, person.last_name AS last_name, Int32(42) AS age, person.state AS state, person.salary AS salary, person.birth_date AS birth_date, person.😀 AS 😀
+      Filter: person.id = UInt32(1)
+        TableScan: person
     Filter: person.id = UInt32(1)
       TableScan: person
         "#
