@@ -43,6 +43,7 @@ use datafusion::{
         view::ViewTable,
         TableProvider,
     },
+    logical_expr::{WriteOp, DmlStatement},
     datasource::{provider_as_source, source_as_provider},
     prelude::SessionContext,
 };
@@ -1591,6 +1592,26 @@ impl AsLogicalPlan for LogicalPlanNode {
             LogicalPlan::Statement(_) => Err(proto_error(
                 "LogicalPlan serde is not yet implemented for Statement",
             )),
+            LogicalPlan::Dml(DmlStatement {
+                table_name,
+                table_schema,
+                op: WriteOp::InsertInto,
+                input,
+                output_schema
+            }) => {
+                eprintln!("Creating LogicalNode for INSERT function");
+                let input = protobuf::LogicalPlanNode::try_from_logical_plan(
+                    input.as_ref(),
+                    extension_codec,
+                )?;
+                Ok(protobuf::LogicalPlanNode {
+                    logical_plan_type: Some(LogicalPlanType::InsertInto(Box::new(
+                        protobuf::InsertIntoNode {
+                            input: Some(Box::new(input))
+                        },
+                    ))),
+                })
+            },
             LogicalPlan::Dml(_) => Err(proto_error(
                 "LogicalPlan serde is not yet implemented for Dml",
             )),

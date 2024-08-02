@@ -104,6 +104,8 @@ pub mod logical_plan_node {
         DistinctOn(::prost::alloc::boxed::Box<super::DistinctOnNode>),
         #[prost(message, tag = "29")]
         CopyTo(::prost::alloc::boxed::Box<super::CopyToNode>),
+        #[prost(message, tag = "30")]
+        InsertInto(::prost::alloc::boxed::Box<super::InsertIntoNode>),
     }
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -519,6 +521,12 @@ pub mod copy_to_node {
         #[prost(message, tag = "12")]
         Arrow(super::ArrowOptions),
     }
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct InsertIntoNode {
+    #[prost(message, optional, boxed, tag = "1")]
+    pub input: ::core::option::Option<::prost::alloc::boxed::Box<LogicalPlanNode>>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
