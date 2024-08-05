@@ -525,8 +525,14 @@ pub mod copy_to_node {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InsertIntoNode {
-    #[prost(message, optional, boxed, tag = "1")]
+    #[prost(message, optional, tag = "1")]
+    pub table_name: ::core::option::Option<TableReference>,
+    #[prost(message, optional, tag = "2")]
+    pub table_schema: ::core::option::Option<DfSchema>,
+    #[prost(message, optional, boxed, tag = "3")]
     pub input: ::core::option::Option<::prost::alloc::boxed::Box<LogicalPlanNode>>,
+    #[prost(message, optional, tag = "4")]
+    pub output_schema: ::core::option::Option<DfSchema>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
