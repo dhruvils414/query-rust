@@ -1630,7 +1630,7 @@ impl AsLogicalPlan for LogicalPlanNode {
                     input.as_ref(),
                     extension_codec,
                 )?;
-                Ok(protobuf::LogicalPlanNode {
+                let insert_plan = protobuf::LogicalPlanNode {
                     logical_plan_type: Some(LogicalPlanType::InsertInto(Box::new(
                         protobuf::InsertIntoNode {
                             table_name: Some(table_name.clone().into()),
@@ -1639,7 +1639,9 @@ impl AsLogicalPlan for LogicalPlanNode {
                             output_schema: Some(output_schema.try_into()?),
                         },
                     ))),
-                })
+                };
+                eprintln!("Created LogicalNode for INSERT function with LogicalNode: {:#?}", insert_plan);
+                Ok(insert_plan)
             },
             LogicalPlan::Dml(_) => Err(proto_error(
                 "LogicalPlan serde is not yet implemented for Dml",
