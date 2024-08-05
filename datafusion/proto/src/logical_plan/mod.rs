@@ -876,6 +876,32 @@ impl AsLogicalPlan for LogicalPlanNode {
                         options: Default::default(),
                     },
                 ))
+            },
+            LogicalPlanType::InsertInto(insert) => {
+                let input: LogicalPlan =
+                    into_logical_plan!(insert.input, ctx, extension_codec)?;
+                let table_name =
+                    from_table_reference(insert.table_name.as_ref(), "InsertInto")?;
+                let table_schema = (insert.table_schema.clone()).ok_or_else(|| {
+                    DataFusionError::Internal(String::from(
+                        "Protobuf deserialization error, InsertInto node was missing required field table_schema.",
+                    ))
+                })?;
+                let output_schema = (insert.output_schema.clone()).ok_or_else(|| {
+                    DataFusionError::Internal(String::from(
+                        "Protobuf deserialization error, InsertInto node was missing required field output_schema.",
+                    ))
+                })?;
+
+                Ok(datafusion_expr::LogicalPlan::Dml(
+                    datafusion_expr::DmlStatement {
+                        table_name,
+                        table_schema: table_schema.try_into()?,
+                        op: WriteOp::InsertInto,
+                        input: Arc::new(input),
+                        output_schema: output_schema.try_into()?,
+                    }
+                ))
             }
         }
     }
@@ -1607,7 +1633,10 @@ impl AsLogicalPlan for LogicalPlanNode {
                 Ok(protobuf::LogicalPlanNode {
                     logical_plan_type: Some(LogicalPlanType::InsertInto(Box::new(
                         protobuf::InsertIntoNode {
-                            input: Some(Box::new(input))
+                            table_name: Some(table_name.clone().into()),
+                            table_schema: Some(table_schema.try_into()?),
+                            input: Some(Box::new(input)),
+                            output_schema: Some(output_schema.try_into()?),
                         },
                     ))),
                 })
