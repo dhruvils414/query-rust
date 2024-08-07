@@ -220,6 +220,7 @@ impl AsLogicalPlan for LogicalPlanNode {
     where
         Self: Sized,
     {
+        eprintln!("Decoding Logical Plan");
         LogicalPlanNode::decode(buf).map_err(|e| {
             DataFusionError::Internal(format!("failed to decode logical plan: {e:?}"))
         })
@@ -240,7 +241,9 @@ impl AsLogicalPlan for LogicalPlanNode {
         ctx: &SessionContext,
         extension_codec: &dyn LogicalExtensionCodec,
     ) -> Result<LogicalPlan> {
-        let plan = self.logical_plan_type.as_ref().ok_or_else(|| {
+        let plan = self.logical_plan_type.as_ref();
+        eprintln!("try into logical plan {:#?}", plan.clone());
+        let plan = plan.ok_or_else(|| {
             proto_error(format!(
                 "logical_plan::from_proto() Unsupported logical plan '{self:?}'"
             ))
