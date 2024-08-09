@@ -15,12 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use datafusion_iceberg::catalog::catalog::IcebergCatalog;
+
 
 use iceberg_rust::catalog::Catalog;
 use iceberg_sql_catalog::SqlCatalog;
-use object_store::local::LocalFileSystem;
-use object_store::ObjectStore;
+
+
 
 
 use tokio::runtime::Runtime;
@@ -29,8 +29,7 @@ use datafusion_iceberg::DataFusionTable;
 
 
 use iceberg_rust::{
-    catalog::tabular::Tabular,
-    error::Error as IcebergError,
+    catalog::tabular::Tabular
 };
 
 use tokio::sync::{RwLock};
@@ -130,7 +129,7 @@ pub trait AsLogicalPlan: Debug + Send + Sync + Clone {
         Self: Sized;
 }
 
-
+#[derive(Clone, PartialEq, Eq, ::prost::Message)]
 pub struct TableProto {
     /// URL of the table root
     #[prost(string, tag = "1")]
@@ -240,11 +239,9 @@ impl LogicalExtensionCodec for DefaultLogicalExtensionCodec {
         // Now you can convert `table` to `DataFusionTable`
         let table_provider = DataFusionTable::from(table);
 
-        let table_provider_arc: Arc<dyn TableProvider> = Arc::new(table_provider);
-
+        let table_provider_arc: Arc<dyn TableProvider> =  Arc::new(table_provider.as_ref() as &dyn TableProvider);
 
         //println!("{:?}", table_provider);
-
 
         Ok(table_provider_arc)
     }

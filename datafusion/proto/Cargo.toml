@@ -58,7 +58,8 @@ serde_json = { workspace = true, optional = true }
 iceberg-rust = { git = "https://github.com/dhruvils414/iceberg-rust.git", branch = "object_store" }
 datafusion_iceberg = { git = "https://github.com/dhruvils414/iceberg-rust.git", branch = "object_store" }
 iceberg-sql-catalog = { git = "https://github.com/dhruvils414/iceberg-rust.git", branch = "object_store" }
-
+tokio = { workspace = true, features = ["full"] }
+lazy_static = "1.5.0"
 
 [dev-dependencies]
 datafusion-functions = { workspace = true, default-features = true }
