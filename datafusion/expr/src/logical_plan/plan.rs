@@ -505,7 +505,11 @@ impl LogicalPlan {
                 // todo it isn't clear why the schema is not recomputed here
                 Ok(LogicalPlan::Values(Values { schema, values }))
             }
-            LogicalPlan::Filter(Filter { predicate, input, filter_op }) => {
+            LogicalPlan::Filter(Filter {
+                predicate,
+                input,
+                filter_op,
+            }) => {
                 // todo: should this logic be moved to Filter::try_new?
 
                 // filter predicates should not contain aliased expressions so we remove any aliases
@@ -539,7 +543,8 @@ impl LogicalPlan {
                     })
                     .data()?;
 
-                Filter::try_new_with_op(predicate, input, filter_op).map(LogicalPlan::Filter)
+                Filter::try_new_with_op(predicate, input, filter_op)
+                    .map(LogicalPlan::Filter)
             }
             LogicalPlan::Repartition(_) => Ok(self),
             LogicalPlan::Window(Window {
@@ -737,7 +742,7 @@ impl LogicalPlan {
                         .collect(),
                 }))
             }
-            LogicalPlan::Filter(Filter {filter_op, ..}) => {
+            LogicalPlan::Filter(Filter { filter_op, .. }) => {
                 assert_eq!(1, expr.len());
                 let predicate = expr.pop().unwrap();
 
@@ -772,8 +777,12 @@ impl LogicalPlan {
                     })
                     .data()?;
 
-                Filter::try_new_with_op(predicate, Arc::new(inputs.swap_remove(0)), *filter_op)
-                    .map(LogicalPlan::Filter)
+                Filter::try_new_with_op(
+                    predicate,
+                    Arc::new(inputs.swap_remove(0)),
+                    *filter_op,
+                )
+                .map(LogicalPlan::Filter)
             }
             LogicalPlan::Repartition(Repartition {
                 partitioning_scheme,
@@ -1929,7 +1938,6 @@ impl SubqueryAlias {
     }
 }
 
-
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 /// Represents the type of filter operation to be performed.
 ///
@@ -1941,7 +1949,6 @@ pub enum FilterOp {
     Update,
     Delete,
 }
-
 
 /// Filters rows from its input that do not match an
 /// expression (essentially a WHERE clause with a predicate
@@ -1989,7 +1996,11 @@ impl Filter {
             );
         }
 
-        Ok(Self { predicate, input , filter_op: FilterOp::Filter})
+        Ok(Self {
+            predicate,
+            input,
+            filter_op: FilterOp::Filter,
+        })
     }
 
     /// Create a new filter operator with the specified filter operation.
@@ -2001,7 +2012,11 @@ impl Filter {
     /// # Errors
     /// Returns an error if the predicate expression does not return a boolean value, or
     /// if the predicate is aliased.
-    pub fn try_new_with_op(predicate: Expr, input: Arc<LogicalPlan>, filter_op: FilterOp) -> Result<Self> {
+    pub fn try_new_with_op(
+        predicate: Expr,
+        input: Arc<LogicalPlan>,
+        filter_op: FilterOp,
+    ) -> Result<Self> {
         let filter = Filter::try_new(predicate, input)?;
 
         Ok(Self {

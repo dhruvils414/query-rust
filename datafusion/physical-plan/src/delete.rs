@@ -6,20 +6,22 @@ use super::{
     DisplayAs, DisplayFormatType, ExecutionPlan, ExecutionPlanProperties, Partitioning,
     PlanProperties, SendableRecordBatchStream,
 };
+use crate::coalesce_batches::CoalesceBatchesExec;
 use crate::metrics::MetricsSet;
 use crate::stream::RecordBatchStreamAdapter;
 use crate::CoalescePartitionsExec;
-use crate::coalesce_batches::CoalesceBatchesExec;
 
+use crate::filter::FilterExec;
+use crate::insert::make_count_schema;
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use arrow_array::{ArrayRef, UInt64Array};
 use datafusion_common::{exec_err, internal_err, Result};
 use datafusion_execution::TaskContext;
 use datafusion_expr::FilterOp;
-use datafusion_physical_expr::{Distribution, PhysicalSortRequirement, EquivalenceProperties};
-use crate::insert::make_count_schema;
-use crate::filter::FilterExec;
+use datafusion_physical_expr::{
+    Distribution, EquivalenceProperties, PhysicalSortRequirement,
+};
 
 use crate::upsert::OverwriteSink;
 
@@ -64,7 +66,7 @@ impl DeleteSinkExec {
             sink_schema,
             count_schema: make_count_schema(),
             sort_order,
-            cache
+            cache,
         }
     }
 
@@ -211,10 +213,9 @@ impl ExecutionPlan for DeleteSinkExec {
             sink_schema: self.sink_schema.clone(),
             count_schema: self.count_schema.clone(),
             sort_order: self.sort_order.clone(),
-            cache: self.cache.clone()
+            cache: self.cache.clone(),
         }))
     }
-
 
     /// Execute the plan and return a stream of `RecordBatch`es for
     /// the specified partition.
@@ -229,13 +230,22 @@ impl ExecutionPlan for DeleteSinkExec {
 
         let data = self.execute_input_stream(0, context.clone())?;
 
-        let filter_predicate = if let Some(coalesce_partition_exec) = self.input.as_any().downcast_ref::<CoalescePartitionsExec>() {
-            let coalesce_batch_exec = coalesce_partition_exec.input().as_any().downcast_ref::<CoalesceBatchesExec>().unwrap();
+        let filter_predicate = if let Some(coalesce_partition_exec) =
+            self.input.as_any().downcast_ref::<CoalescePartitionsExec>()
+        {
+            let coalesce_batch_exec = coalesce_partition_exec
+                .input()
+                .as_any()
+                .downcast_ref::<CoalesceBatchesExec>()
+                .unwrap();
 
-            let filter_exec = coalesce_batch_exec.input().as_any().downcast_ref::<FilterExec>().unwrap();
+            let filter_exec = coalesce_batch_exec
+                .input()
+                .as_any()
+                .downcast_ref::<FilterExec>()
+                .unwrap();
 
             Some(filter_exec.predicate().clone())
-
         } else {
             None
         };
@@ -244,7 +254,9 @@ impl ExecutionPlan for DeleteSinkExec {
         let sink = self.sink.clone();
 
         let stream = futures::stream::once(async move {
-            sink.overwrite_with(data, &context, filter_predicate, FilterOp::Delete).await.map(make_count_batch)
+            sink.overwrite_with(data, &context, filter_predicate, FilterOp::Delete)
+                .await
+                .map(make_count_batch)
         })
         .boxed();
 
@@ -269,7 +281,6 @@ pub fn make_count_batch(count: u64) -> RecordBatch {
 
     RecordBatch::try_from_iter_with_nullable(vec![("count", array, false)]).unwrap()
 }
-
 
 fn check_not_null_constraints(
     batch: RecordBatch,

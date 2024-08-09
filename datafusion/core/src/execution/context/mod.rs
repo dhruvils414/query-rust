@@ -524,9 +524,7 @@ impl SessionContext {
                 self.set_variable(stmt).await
             }
 
-            plan =>{
-                Ok(DataFrame::new(self.state(), plan))
-            }
+            plan => Ok(DataFrame::new(self.state(), plan)),
         }
     }
 

@@ -43,14 +43,14 @@ use datafusion_expr::logical_plan::builder::project;
 use datafusion_expr::logical_plan::DdlStatement;
 use datafusion_expr::utils::expr_to_columns;
 use datafusion_expr::{
-    cast, col, Union, Analyze, CreateCatalog, CreateCatalogSchema,
+    cast, col, Analyze, CreateCatalog, CreateCatalogSchema,
     CreateExternalTable as PlanCreateExternalTable, CreateFunction, CreateFunctionBody,
     CreateMemoryTable, CreateView, DescribeTable, DmlStatement, DropCatalogSchema,
-    DropFunction, DropTable, DropView, EmptyRelation, Explain, ExprSchemable, Filter, FilterOp,
-    LogicalPlan, LogicalPlanBuilder, OperateFunctionArg, PlanType, Prepare, SetVariable,
-    Statement as PlanStatement, ToStringifiedPlan, TransactionAccessMode,
+    DropFunction, DropTable, DropView, EmptyRelation, Explain, ExprSchemable, Filter,
+    FilterOp, LogicalPlan, LogicalPlanBuilder, OperateFunctionArg, PlanType, Prepare,
+    SetVariable, Statement as PlanStatement, ToStringifiedPlan, TransactionAccessMode,
     TransactionConclusion, TransactionEnd, TransactionIsolationLevel, TransactionStart,
-    Volatility, WriteOp,
+    Union, Volatility, WriteOp,
 };
 use sqlparser::ast;
 use sqlparser::ast::{
@@ -1204,9 +1204,11 @@ impl<'a, S: ContextProvider> SqlToRel<'a, S> {
                     &[&[&schema]],
                     &[using_columns],
                 )?;
-                LogicalPlan::Filter(
-                    Filter::try_new_with_op(filter_expr, Arc::new(scan), FilterOp::Delete)?
-                )
+                LogicalPlan::Filter(Filter::try_new_with_op(
+                    filter_expr,
+                    Arc::new(scan),
+                    FilterOp::Delete,
+                )?)
             }
         };
 
@@ -1263,9 +1265,7 @@ impl<'a, S: ContextProvider> SqlToRel<'a, S> {
 
         // Filter
         let source = match predicate_expr.clone() {
-            None => {
-                scan.clone()
-            },
+            None => scan.clone(),
             Some(predicate_expr) => {
                 let filter_expr = self.sql_to_expr(
                     predicate_expr,
@@ -1279,7 +1279,11 @@ impl<'a, S: ContextProvider> SqlToRel<'a, S> {
                     &[&[scan.schema()]],
                     &[using_columns],
                 )?;
-                LogicalPlan::Filter(Filter::try_new_with_op(filter_expr, Arc::new(scan.clone()), FilterOp::Update)?)
+                LogicalPlan::Filter(Filter::try_new_with_op(
+                    filter_expr,
+                    Arc::new(scan.clone()),
+                    FilterOp::Update,
+                )?)
             }
         };
 
@@ -1328,8 +1332,11 @@ impl<'a, S: ContextProvider> SqlToRel<'a, S> {
         let update_source = match predicate_expr.clone() {
             None => source,
             Some(predicate_expr) => {
-                let filter_expr =
-                    self.sql_to_expr(predicate_expr, scan.schema(), &mut planner_context)?;
+                let filter_expr = self.sql_to_expr(
+                    predicate_expr,
+                    scan.schema(),
+                    &mut planner_context,
+                )?;
                 let mut using_columns = HashSet::new();
                 expr_to_columns(&filter_expr, &mut using_columns)?;
                 let filter_expr = normalize_col_with_schemas_and_ambiguity_check(
@@ -1337,13 +1344,15 @@ impl<'a, S: ContextProvider> SqlToRel<'a, S> {
                     &[&[scan.schema()]],
                     &[using_columns],
                 )?;
-                let prune_source = LogicalPlan::Filter(
-                    Filter::try_new_with_op(filter_expr, Arc::new(scan), FilterOp::Delete)?
-                );
+                let prune_source = LogicalPlan::Filter(Filter::try_new_with_op(
+                    filter_expr,
+                    Arc::new(scan),
+                    FilterOp::Delete,
+                )?);
 
                 LogicalPlan::Union(Union {
                     inputs: vec![Arc::new(source), Arc::new(prune_source)],
-                    schema: table_schema.clone()
+                    schema: table_schema.clone(),
                 })
             }
         };

@@ -27,10 +27,10 @@ use crate::config::ConfigOptions;
 use crate::datasource::listing::{ListingTableUrl, PartitionedFile};
 use crate::datasource::object_store::ObjectStoreUrl;
 use crate::datasource::physical_plan::{FileScanConfig, ParquetExec};
-use crate::logical_expr::FilterOp;
 use crate::error::Result;
 use crate::logical_expr::execution_props::ExecutionProps;
 use crate::logical_expr::simplify::SimplifyContext;
+use crate::logical_expr::FilterOp;
 use crate::optimizer::simplify_expressions::ExprSimplifier;
 use crate::physical_expr::create_physical_expr;
 use crate::physical_plan::filter::FilterExec;
@@ -180,7 +180,11 @@ impl TestParquetFile {
                 parquet_options,
             ));
 
-            let exec = Arc::new(FilterExec::try_new(physical_filter_expr, parquet_exec, FilterOp::Filter)?);
+            let exec = Arc::new(FilterExec::try_new(
+                physical_filter_expr,
+                parquet_exec,
+                FilterOp::Filter,
+            )?);
             Ok(exec)
         } else {
             Ok(Arc::new(ParquetExec::new(

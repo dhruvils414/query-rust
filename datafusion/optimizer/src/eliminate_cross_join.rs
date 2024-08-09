@@ -134,8 +134,10 @@ impl OptimizerRule for EliminateCrossJoin {
         } else {
             // Remove join expressions from filter:
             match remove_join_expressions(predicate, &all_join_keys)? {
-                Some(filter_expr) => Filter::try_new_with_op(filter_expr, Arc::new(left), filter_op)
-                    .map(|f| Some(LogicalPlan::Filter(f))),
+                Some(filter_expr) => {
+                    Filter::try_new_with_op(filter_expr, Arc::new(left), filter_op)
+                        .map(|f| Some(LogicalPlan::Filter(f)))
+                }
                 _ => Ok(Some(left)),
             }
         }

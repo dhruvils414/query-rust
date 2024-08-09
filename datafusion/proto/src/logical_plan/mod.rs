@@ -15,27 +15,18 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
-
 use iceberg_rust::catalog::Catalog;
 use iceberg_sql_catalog::SqlCatalog;
-
-
-
 
 use tokio::runtime::Runtime;
 
 use datafusion_iceberg::DataFusionTable;
 
+use iceberg_rust::catalog::tabular::Tabular;
 
-use iceberg_rust::{
-    catalog::tabular::Tabular
-};
-
-use tokio::sync::{RwLock};
+use tokio::sync::RwLock;
 
 use iceberg_rust::catalog::identifier::Identifier;
-
 
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -143,7 +134,6 @@ pub struct TableProto {
     pub url: String,
 }
 
-
 pub trait LogicalExtensionCodec: Debug + Send + Sync {
     fn try_decode(
         &self,
@@ -198,7 +188,9 @@ impl LogicalExtensionCodec for DefaultLogicalExtensionCodec {
         buf: &[u8],
         table_ref: Arc<datafusion::arrow::datatypes::Schema>,
         ctx: &SessionContext,
-    ) -> datafusion::error::Result<Arc<dyn datafusion::datasource::TableProvider>> {
+    ) -> datafusion::error::Result<Arc<dyn TableProvider>> {
+
+
         let msg = TableProto::decode(buf).map_err(|_| {
             DataFusionError::Internal("Error decoding test table".to_string())
         })?;
@@ -221,15 +213,11 @@ impl LogicalExtensionCodec for DefaultLogicalExtensionCodec {
             // Block on the async read call
             let identifier = Identifier::parse(&msg.identifier).unwrap();
             let rt = tokio::runtime::Runtime::new().unwrap();
-            rt.block_on(async {
-                catalog.load_tabular(&identifier).await
-            })
+            rt.block_on(async { catalog.load_tabular(&identifier).await })
         });
 
-        //println!("{:?}", table);
-
         let table = match table {
-            Ok(tabular) => tabular,
+            Ok(tabular) =>  tabular,
             Err(e) => {
                 eprintln!("Error occurred: {}", e);
                 return Err(DataFusionError::External(Box::new(e)));
@@ -237,13 +225,11 @@ impl LogicalExtensionCodec for DefaultLogicalExtensionCodec {
         };
 
         // Now you can convert `table` to `DataFusionTable`
-        let table_provider = DataFusionTable::from(table);
-
-        let table_provider_arc: Arc<dyn TableProvider> =  Arc::new(table_provider.as_ref() as &dyn TableProvider);
+        let table_provider:  DataFusionTable = DataFusionTable::from(table);
 
         //println!("{:?}", table_provider);
 
-        Ok(table_provider_arc)
+        Ok(Arc::new(table_provider))
     }
 
     fn try_encode_table_provider(
@@ -259,7 +245,6 @@ impl LogicalExtensionCodec for DefaultLogicalExtensionCodec {
             rt.block_on(table.expect("REASON").read())
         });
 
-
         let identifier = read_lock.identifier();
 
         let binding = read_lock.catalog();
@@ -267,17 +252,17 @@ impl LogicalExtensionCodec for DefaultLogicalExtensionCodec {
         let region = binding.region();
         let url = binding.database_url();
 
-
         let msg = TableProto {
             identifier: (&identifier).to_string(), // Added `.to_string()` to convert to String type
-            location: location,    // Added `.to_string()` to convert to String type
+            location: location, // Added `.to_string()` to convert to String type
             region: region,
-            url:url,
+            url: url,
         };
 
         //println!("{:?}",msg);
-        msg.encode(buf)
-            .map_err(|_| DataFusionError::Internal("Error encoding test table".to_string()))
+        msg.encode(buf).map_err(|_| {
+            DataFusionError::Internal("Error encoding test table".to_string())
+        })
     }
 }
 

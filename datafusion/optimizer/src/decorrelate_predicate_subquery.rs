@@ -134,7 +134,10 @@ impl OptimizerRule for DecorrelatePredicateSubquery {
         }
 
         let Filter {
-            predicate, input, filter_op, ..
+            predicate,
+            input,
+            filter_op,
+            ..
         } = filter;
         let (subqueries, mut other_exprs) =
             self.extract_subquery_exprs(predicate, config)?;
@@ -181,7 +184,8 @@ impl OptimizerRule for DecorrelatePredicateSubquery {
 
         let expr = conjunction(other_exprs);
         if let Some(expr) = expr {
-            let new_filter = Filter::try_new_with_op(expr, Arc::new(cur_input), filter_op)?;
+            let new_filter =
+                Filter::try_new_with_op(expr, Arc::new(cur_input), filter_op)?;
             cur_input = LogicalPlan::Filter(new_filter);
         }
         Ok(Transformed::yes(cur_input))

@@ -1304,6 +1304,7 @@ pub(crate) mod tests {
 
     use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
     use datafusion_common::ScalarValue;
+    use datafusion_expr::FilterOp;
     use datafusion_expr::Operator;
     use datafusion_physical_expr::expressions::{BinaryExpr, Literal};
     use datafusion_physical_expr::{
@@ -1311,7 +1312,6 @@ pub(crate) mod tests {
         PhysicalSortExpr, PhysicalSortRequirement,
     };
     use datafusion_physical_plan::PlanProperties;
-    use datafusion_expr::FilterOp;
 
     /// Models operators like BoundedWindowExec that require an input
     /// ordering but is easy to construct

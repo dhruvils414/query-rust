@@ -32,15 +32,15 @@ use crate::{
     DisplayFormatType, ExecutionPlan,
 };
 
-use arrow_array::BooleanArray;
 use arrow::compute::filter_record_batch;
 use arrow::datatypes::{DataType, SchemaRef};
 use arrow::record_batch::RecordBatch;
+use arrow_array::BooleanArray;
 use datafusion_common::cast::as_boolean_array;
 use datafusion_common::stats::Precision;
 use datafusion_common::{plan_err, DataFusionError, Result};
 use datafusion_execution::TaskContext;
-use datafusion_expr::{Operator, FilterOp};
+use datafusion_expr::{FilterOp, Operator};
 use datafusion_physical_expr::expressions::BinaryExpr;
 use datafusion_physical_expr::intervals::utils::check_support;
 use datafusion_physical_expr::utils::collect_columns;
@@ -264,12 +264,16 @@ impl ExecutionPlan for FilterExec {
         self: Arc<Self>,
         mut children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        FilterExec::try_new(self.predicate.clone(), children.swap_remove(0), self.filter_op)
-            .and_then(|e| {
-                let selectivity = e.default_selectivity();
-                e.with_default_selectivity(selectivity)
-            })
-            .map(|e| Arc::new(e) as _)
+        FilterExec::try_new(
+            self.predicate.clone(),
+            children.swap_remove(0),
+            self.filter_op,
+        )
+        .and_then(|e| {
+            let selectivity = e.default_selectivity();
+            e.with_default_selectivity(selectivity)
+        })
+        .map(|e| Arc::new(e) as _)
     }
 
     fn execute(
@@ -348,7 +352,7 @@ struct FilterExecStream {
     /// runtime metrics recording
     baseline_metrics: BaselineMetrics,
     /// filter operator
-    filter_op: FilterOp
+    filter_op: FilterOp,
 }
 
 pub(crate) fn batch_filter(
@@ -364,7 +368,6 @@ pub(crate) fn batch_filter(
             Ok(filter_record_batch(batch, &filter_array)?)
         })
 }
-
 
 pub(crate) fn invert_boolean_array(boolean_array: &BooleanArray) -> Result<BooleanArray> {
     let mut builder = BooleanArray::builder(boolean_array.len());
@@ -399,7 +402,7 @@ pub(crate) fn _batch_append(
     batch2: &RecordBatch,
 ) -> Result<RecordBatch> {
     // both schemas should be same
-    if batch1.schema()!= batch2.schema() {
+    if batch1.schema() != batch2.schema() {
         return Err(DataFusionError::Internal(format!(
             "Schema mismatch in batch append. Batch1 schema: {:?}, Batch2 schema: {:?}",
             batch1.schema(),
@@ -410,7 +413,6 @@ pub(crate) fn _batch_append(
     // Create a new record batch, where the columns of 1st record batch are appended to the columns of second record batch
     // batch1.column(0) appended to batch2.column(0) , similarly
     // batch1.column(1) appended to batch2.column(1)
-
 
     let mut columns = Vec::with_capacity(batch1.num_columns());
     for i in 0..batch1.num_columns() {
@@ -440,8 +442,12 @@ impl Stream for FilterExecStream {
                     Some(Ok(batch)) => {
                         let timer = self.baseline_metrics.elapsed_compute().timer();
                         let filtered_batch = match self.filter_op {
-                            FilterOp::Filter | FilterOp::Update => batch_filter(&batch, &self.predicate)?,
-                            FilterOp::Delete => batch_filter_negative(&batch, &self.predicate)?,
+                            FilterOp::Filter | FilterOp::Update => {
+                                batch_filter(&batch, &self.predicate)?
+                            }
+                            FilterOp::Delete => {
+                                batch_filter_negative(&batch, &self.predicate)?
+                            }
                         };
                         // skip entirely filtered batches
                         if filtered_batch.num_rows() == 0 {
@@ -478,7 +484,9 @@ impl RecordBatchStream for FilterExecStream {
 }
 
 /// Return the equals Column-Pairs and Non-equals Column-Pairs
-pub fn collect_columns_from_predicate(predicate: &Arc<dyn PhysicalExpr>) -> EqualAndNonEqual {
+pub fn collect_columns_from_predicate(
+    predicate: &Arc<dyn PhysicalExpr>,
+) -> EqualAndNonEqual {
     let mut eq_predicate_columns = Vec::<PhysicalExprPairRef>::new();
     let mut ne_predicate_columns = Vec::<PhysicalExprPairRef>::new();
 
@@ -632,7 +640,7 @@ mod tests {
         let sub_filter: Arc<dyn ExecutionPlan> = Arc::new(FilterExec::try_new(
             binary(col("a", &schema)?, Operator::LtEq, lit(25i32), &schema)?,
             input,
-            FilterOp::Filter
+            FilterOp::Filter,
         )?);
 
         // Nested filters (two separate physical plans, instead of AND chain in the expr)
@@ -640,7 +648,8 @@ mod tests {
         // WHERE a <= 25
         let filter: Arc<dyn ExecutionPlan> = Arc::new(FilterExec::try_new(
             binary(col("a", &schema)?, Operator::GtEq, lit(10i32), &schema)?,
-            sub_filter,FilterOp::Filter
+            sub_filter,
+            FilterOp::Filter,
         )?);
 
         let statistics = filter.statistics()?;
@@ -689,19 +698,22 @@ mod tests {
         // WHERE a <= 25
         let a_lte_25: Arc<dyn ExecutionPlan> = Arc::new(FilterExec::try_new(
             binary(col("a", &schema)?, Operator::LtEq, lit(25i32), &schema)?,
-            input, FilterOp::Filter
+            input,
+            FilterOp::Filter,
         )?);
 
         // WHERE b > 45
         let b_gt_5: Arc<dyn ExecutionPlan> = Arc::new(FilterExec::try_new(
             binary(col("b", &schema)?, Operator::Gt, lit(45i32), &schema)?,
-            a_lte_25, FilterOp::Filter
+            a_lte_25,
+            FilterOp::Filter,
         )?);
 
         // WHERE a >= 10
         let filter: Arc<dyn ExecutionPlan> = Arc::new(FilterExec::try_new(
             binary(col("a", &schema)?, Operator::GtEq, lit(10i32), &schema)?,
-            b_gt_5, FilterOp::Filter
+            b_gt_5,
+            FilterOp::Filter,
         )?);
         let statistics = filter.statistics()?;
         // On a uniform distribution, only fifteen rows will satisfy the
@@ -1195,7 +1207,7 @@ mod tests {
                 &schema,
             )?,
             Arc::new(EmptyExec::new(schema.clone())),
-            FilterOp::Filter
+            FilterOp::Filter,
         )?;
 
         exec.statistics().unwrap();

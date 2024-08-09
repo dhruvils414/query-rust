@@ -33,9 +33,9 @@ use super::{
     ExecutionPlanProperties, Partitioning, PlanProperties, RecordBatchStream,
     SendableRecordBatchStream, Statistics,
 };
-use crate::stream::RecordBatchStreamAdapter;
 use crate::metrics::BaselineMetrics;
 use crate::stream::ObservedStream;
+use crate::stream::RecordBatchStreamAdapter;
 
 use arrow::datatypes::{Field, Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
@@ -251,7 +251,10 @@ impl ExecutionPlan for UnionExec {
             if partition < input.output_partitioning().partition_count() {
                 let stream = input.execute(partition, context.clone())?;
                 debug!("Found a Union partition to execute");
-                return Ok(Box::pin(ObservedStream::new(stream, baseline_metrics.clone())));
+                return Ok(Box::pin(ObservedStream::new(
+                    stream,
+                    baseline_metrics.clone(),
+                )));
             } else {
                 partition -= input.output_partitioning().partition_count();
             }
@@ -271,7 +274,6 @@ impl ExecutionPlan for UnionExec {
             )),
             baseline_metrics,
         )))
-
     }
 
     fn metrics(&self) -> Option<MetricsSet> {

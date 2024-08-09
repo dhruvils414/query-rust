@@ -75,8 +75,9 @@ use datafusion_common::parsers::CompressionTypeVariant;
 use datafusion_common::stats::Precision;
 use datafusion_common::{not_impl_err, plan_err, DataFusionError, Result};
 use datafusion_expr::{
-    FilterOp, Accumulator, AccumulatorFactoryFunction, AggregateUDF, ColumnarValue, ScalarUDF,
-    ScalarUDFImpl, Signature, SimpleAggregateUDF, WindowFrame, WindowFrameBound,
+    Accumulator, AccumulatorFactoryFunction, AggregateUDF, ColumnarValue, FilterOp,
+    ScalarUDF, ScalarUDFImpl, Signature, SimpleAggregateUDF, WindowFrame,
+    WindowFrameBound,
 };
 use datafusion_proto::physical_plan::{
     AsExecutionPlan, DefaultPhysicalExtensionCodec, PhysicalExtensionCodec,
@@ -461,7 +462,7 @@ fn roundtrip_filter_with_not_and_in_list() -> Result<()> {
     roundtrip_test(Arc::new(FilterExec::try_new(
         and,
         Arc::new(EmptyExec::new(schema.clone())),
-        FilterOp::Filter
+        FilterOp::Filter,
     )?))
 }
 
@@ -763,7 +764,7 @@ fn roundtrip_scalar_udf_extension_codec() -> Result<()> {
             Arc::new(BinaryExpr::new(udf_expr.clone(), Operator::Gt, lit(0))),
         )),
         input,
-        FilterOp::Filter
+        FilterOp::Filter,
     )?);
 
     let window = Arc::new(WindowAggExec::try_new(

@@ -27,6 +27,7 @@ use super::output_requirements::OutputRequirementExec;
 use super::PhysicalOptimizerRule;
 use crate::datasource::physical_plan::CsvExec;
 use crate::error::Result;
+use crate::logical_expr::FilterOp;
 use crate::physical_plan::coalesce_partitions::CoalescePartitionsExec;
 use crate::physical_plan::filter::FilterExec;
 use crate::physical_plan::joins::utils::{ColumnIndex, JoinFilter};
@@ -34,7 +35,6 @@ use crate::physical_plan::joins::{
     CrossJoinExec, HashJoinExec, NestedLoopJoinExec, SortMergeJoinExec,
     SymmetricHashJoinExec,
 };
-use crate::logical_expr::FilterOp;
 use crate::physical_plan::memory::MemoryExec;
 use crate::physical_plan::projection::ProjectionExec;
 use crate::physical_plan::repartition::RepartitionExec;
@@ -399,12 +399,16 @@ fn try_swapping_with_filter(
         return Ok(None);
     };
 
-    FilterExec::try_new(new_predicate, make_with_child(projection, filter.input())?, FilterOp::Filter)
-        .and_then(|e| {
-            let selectivity = filter.default_selectivity();
-            e.with_default_selectivity(selectivity)
-        })
-        .map(|e| Some(Arc::new(e) as _))
+    FilterExec::try_new(
+        new_predicate,
+        make_with_child(projection, filter.input())?,
+        FilterOp::Filter,
+    )
+    .and_then(|e| {
+        let selectivity = filter.default_selectivity();
+        e.with_default_selectivity(selectivity)
+    })
+    .map(|e| Some(Arc::new(e) as _))
 }
 
 /// Tries to swap the projection with its input [`RepartitionExec`]. If it can be done,

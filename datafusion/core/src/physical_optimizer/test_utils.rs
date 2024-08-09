@@ -43,7 +43,9 @@ use arrow_schema::{Schema, SchemaRef, SortOptions};
 use datafusion_common::tree_node::{Transformed, TransformedResult, TreeNode};
 use datafusion_common::{JoinType, Statistics};
 use datafusion_execution::object_store::ObjectStoreUrl;
-use datafusion_expr::{AggregateFunction, WindowFrame, WindowFunctionDefinition, FilterOp};
+use datafusion_expr::{
+    AggregateFunction, FilterOp, WindowFrame, WindowFunctionDefinition,
+};
 use datafusion_physical_expr::expressions::col;
 use datafusion_physical_expr::{PhysicalExpr, PhysicalSortExpr};
 use datafusion_physical_plan::displayable;

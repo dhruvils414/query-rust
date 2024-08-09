@@ -586,7 +586,7 @@ impl DefaultPhysicalPlanner {
         session_state: &SessionState,
     ) -> Result<Arc<dyn ExecutionPlan>> {
         // Conduct a DFS on the tree to flatten it into a Vec.
-        // This will give a topological Sort 
+        // This will give a topological Sort
         // ( approx : for us to determine the order of execution for child-nodes )
 
         // This will allow us to build the Physical Plan from the leaves up
@@ -775,15 +775,14 @@ impl DefaultPhysicalPlanner {
 
                 match source
                     .scan(session_state, projection.as_ref(), &filters, *fetch)
-                    .await {
-                        Ok(provider) => {
-                            provider
-                        },
-                        Err(e) => {
-                            return exec_err!("Error in provider {:?}", e);
-                        }
+                    .await
+                {
+                    Ok(provider) => provider,
+                    Err(e) => {
+                        return exec_err!("Error in provider {:?}", e);
                     }
-            },
+                }
+            }
             LogicalPlan::Values(Values { values, schema }) => {
                 let exec_schema = schema.as_ref().to_owned().into();
                 let exprs = values
@@ -924,11 +923,7 @@ impl DefaultPhysicalPlanner {
                     let update_exec = children.one()?;
 
                     provider
-                        .update_table(
-                            session_state,
-                            update_exec.clone(),
-                            false
-                        )
+                        .update_table(session_state, update_exec.clone(), false)
                         .await?
                 } else {
                     return exec_err!("Table '{table_name}' does not exist");
@@ -1129,7 +1124,10 @@ impl DefaultPhysicalPlanner {
                     expr,
                 )?,
             LogicalPlan::Filter(Filter {
-                predicate, input, filter_op, ..
+                predicate,
+                input,
+                filter_op,
+                ..
             }) => {
                 let physical_input = children.one()?;
                 let input_dfschema = input.schema();
@@ -1141,10 +1139,11 @@ impl DefaultPhysicalPlanner {
                     .options()
                     .optimizer
                     .default_filter_selectivity;
-                let filter = FilterExec::try_new(runtime_expr, physical_input, *filter_op)?;
+                let filter =
+                    FilterExec::try_new(runtime_expr, physical_input, *filter_op)?;
 
                 Arc::new(filter.with_default_selectivity(selectivity)?)
-            },
+            }
             LogicalPlan::Repartition(Repartition {
                 input,
                 partitioning_scheme,

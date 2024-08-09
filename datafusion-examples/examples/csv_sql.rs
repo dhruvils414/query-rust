@@ -37,13 +37,15 @@ async fn main() -> Result<()> {
     .await?;
 
     // TEST :: UPDATE Query
-    let df_update = ctx.sql(
-        "UPDATE aggregate_test_100 \
+    let df_update = ctx
+        .sql(
+            "UPDATE aggregate_test_100 \
         SET \
             c3 = 1 \
         WHERE \
             c2 = 2;",
-    ).await?;
+        )
+        .await?;
     println!("SQL Query running complete");
     println!("{:#?}", df_update.clone());
 

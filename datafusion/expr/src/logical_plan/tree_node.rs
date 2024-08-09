@@ -87,13 +87,15 @@ impl TreeNode for LogicalPlan {
                     schema,
                 })
             }),
-            LogicalPlan::Filter(Filter { predicate, input, filter_op}) => rewrite_arc(
-                input, f
-            )?
-                .update_data(
-                    |input| 
-                    LogicalPlan::Filter(Filter::try_new_with_op(predicate, input, filter_op).unwrap())
-                ),
+            LogicalPlan::Filter(Filter {
+                predicate,
+                input,
+                filter_op,
+            }) => rewrite_arc(input, f)?.update_data(|input| {
+                LogicalPlan::Filter(
+                    Filter::try_new_with_op(predicate, input, filter_op).unwrap(),
+                )
+            }),
             LogicalPlan::Repartition(Repartition {
                 input,
                 partitioning_scheme,
@@ -566,10 +568,15 @@ impl LogicalPlan {
                     value.into_iter().map_until_stop_and_collect(&mut f)
                 })?
                 .update_data(|values| LogicalPlan::Values(Values { schema, values })),
-            LogicalPlan::Filter(Filter { predicate, input, filter_op}) => f(predicate)?
-                .update_data(|predicate| {
-                    LogicalPlan::Filter(Filter::try_new_with_op(predicate, input, filter_op).unwrap())
-                }),
+            LogicalPlan::Filter(Filter {
+                predicate,
+                input,
+                filter_op,
+            }) => f(predicate)?.update_data(|predicate| {
+                LogicalPlan::Filter(
+                    Filter::try_new_with_op(predicate, input, filter_op).unwrap(),
+                )
+            }),
             LogicalPlan::Repartition(Repartition {
                 input,
                 partitioning_scheme,

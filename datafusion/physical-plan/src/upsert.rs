@@ -1,32 +1,34 @@
 use std::any::Any;
-use std::fmt::Debug;
 use std::fmt;
+use std::fmt::Debug;
 use std::sync::Arc;
 
 use super::{
     DisplayAs, DisplayFormatType, ExecutionPlan, ExecutionPlanProperties, Partitioning,
     PlanProperties, SendableRecordBatchStream,
 };
-use crate::metrics::MetricsSet;
-use crate::stream::RecordBatchStreamAdapter;
-use crate::CoalescePartitionsExec;
-use crate::projection::ProjectionExec;
-use crate::union::UnionExec;
 use crate::coalesce_batches::CoalesceBatchesExec;
+use crate::metrics::MetricsSet;
+use crate::projection::ProjectionExec;
+use crate::stream::RecordBatchStreamAdapter;
+use crate::union::UnionExec;
+use crate::CoalescePartitionsExec;
 
+use crate::filter::FilterExec;
+use crate::insert::make_count_schema;
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use arrow_array::{ArrayRef, UInt64Array};
 use datafusion_common::{exec_err, internal_err, Result};
 use datafusion_execution::TaskContext;
 use datafusion_expr::FilterOp;
-use datafusion_physical_expr::{Distribution, PhysicalSortRequirement, EquivalenceProperties, PhysicalExpr};
-use crate::insert::make_count_schema;
-use crate::filter::FilterExec;
+use datafusion_physical_expr::{
+    Distribution, EquivalenceProperties, PhysicalExpr, PhysicalSortRequirement,
+};
 // use crate::delete::DeleteSinkExec;
 
-use futures::StreamExt;
 use async_trait::async_trait;
+use futures::StreamExt;
 
 /// `OverwriteSink` implements updating streams of [`RecordBatch`]es in
 /// user defined destinations.
@@ -58,7 +60,7 @@ pub trait OverwriteSink: DisplayAs + Debug + Send + Sync {
         input_data: SendableRecordBatchStream,
         context: &Arc<TaskContext>,
         filter: Option<Arc<dyn PhysicalExpr>>,
-        op: FilterOp
+        op: FilterOp,
     ) -> Result<u64>;
 }
 
@@ -105,7 +107,7 @@ impl UpdateSinkExec {
             sink_schema,
             count_schema: make_count_schema(),
             sort_order,
-            cache
+            cache,
         }
     }
 
@@ -253,10 +255,9 @@ impl ExecutionPlan for UpdateSinkExec {
             sink_schema: self.sink_schema.clone(),
             count_schema: self.count_schema.clone(),
             sort_order: self.sort_order.clone(),
-            cache: self.cache.clone()
+            cache: self.cache.clone(),
         }))
     }
-
 
     /// Execute the plan and return a stream of `RecordBatch`es for
     /// the specified partition.
@@ -271,15 +272,34 @@ impl ExecutionPlan for UpdateSinkExec {
 
         let input_data = self.execute_input_plan_stream(0, context.clone())?;
 
-        let filter_predicate = if let Some(coalesce_partition_exec) = self.input_plan.as_any().downcast_ref::<CoalescePartitionsExec>() {
-            let predicate = match coalesce_partition_exec.input().as_any().downcast_ref::<UnionExec>() {
+        let filter_predicate = if let Some(coalesce_partition_exec) = self
+            .input_plan
+            .as_any()
+            .downcast_ref::<CoalescePartitionsExec>()
+        {
+            let predicate = match coalesce_partition_exec
+                .input()
+                .as_any()
+                .downcast_ref::<UnionExec>()
+            {
                 Some(coal_part_exec) => {
-                    let project_exec = coal_part_exec.inputs()[0].as_any().downcast_ref::<ProjectionExec>().unwrap();
-                    let coal_batch_exec = project_exec.input().as_any().downcast_ref::<CoalesceBatchesExec>().unwrap();
-                    let filter_exec = coal_batch_exec.input().as_any().downcast_ref::<FilterExec>().unwrap();
+                    let project_exec = coal_part_exec.inputs()[0]
+                        .as_any()
+                        .downcast_ref::<ProjectionExec>()
+                        .unwrap();
+                    let coal_batch_exec = project_exec
+                        .input()
+                        .as_any()
+                        .downcast_ref::<CoalesceBatchesExec>()
+                        .unwrap();
+                    let filter_exec = coal_batch_exec
+                        .input()
+                        .as_any()
+                        .downcast_ref::<FilterExec>()
+                        .unwrap();
                     Some(filter_exec.predicate().clone())
-                },
-                None => None
+                }
+                None => None,
             };
             predicate
         } else {
@@ -290,7 +310,9 @@ impl ExecutionPlan for UpdateSinkExec {
         let sink = self.sink.clone();
 
         let stream = futures::stream::once(async move {
-            sink.overwrite_with(input_data, &context, filter_predicate, FilterOp::Update).await.map(make_count_batch)
+            sink.overwrite_with(input_data, &context, filter_predicate, FilterOp::Update)
+                .await
+                .map(make_count_batch)
         })
         .boxed();
 
@@ -315,7 +337,6 @@ pub fn make_count_batch(count: u64) -> RecordBatch {
 
     RecordBatch::try_from_iter_with_nullable(vec![("count", array, false)]).unwrap()
 }
-
 
 fn check_not_null_constraints(
     batch: RecordBatch,

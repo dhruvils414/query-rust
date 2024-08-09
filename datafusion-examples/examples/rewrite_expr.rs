@@ -98,9 +98,9 @@ impl MyAnalyzerRule {
                     Transformed::yes(LogicalPlan::Filter(Filter::try_new_with_op(
                         predicate,
                         filter.input,
-                        filter.filter_op
+                        filter.filter_op,
                     )?))
-                },
+                }
                 _ => Transformed::no(plan),
             })
         })
@@ -145,9 +145,9 @@ impl OptimizerRule for MyOptimizerRule {
                 Ok(Some(LogicalPlan::Filter(Filter::try_new_with_op(
                     predicate,
                     filter.input,
-                    filter.filter_op
+                    filter.filter_op,
                 )?)))
-            },
+            }
             Some(optimized_plan) => Ok(Some(optimized_plan)),
             None => match plan {
                 LogicalPlan::Filter(filter) => {
@@ -155,9 +155,9 @@ impl OptimizerRule for MyOptimizerRule {
                     Ok(Some(LogicalPlan::Filter(Filter::try_new_with_op(
                         predicate,
                         filter.input.clone(),
-                        filter.filter_op
+                        filter.filter_op,
                     )?)))
-                },
+                }
                 _ => Ok(None),
             },
         }
