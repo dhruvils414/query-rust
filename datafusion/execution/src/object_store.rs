@@ -39,6 +39,8 @@ impl ObjectStoreUrl {
         let mut parsed =
             Url::parse(s.as_ref()).map_err(|e| DataFusionError::External(Box::new(e)))?;
 
+        println!("in objectstore {:?}",parsed );
+
         let remaining = &parsed[url::Position::BeforePath..];
         if !remaining.is_empty() && remaining != "/" {
             return exec_err!(
