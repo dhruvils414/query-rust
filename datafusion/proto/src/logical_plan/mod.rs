@@ -15,18 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use iceberg_rust::catalog::Catalog;
-use iceberg_sql_catalog::SqlCatalog;
-
 use tokio::runtime::Runtime;
-
-use datafusion_iceberg::DataFusionTable;
-
-use iceberg_rust::catalog::tabular::Tabular;
-
-use tokio::sync::RwLock;
-
-use iceberg_rust::catalog::identifier::Identifier;
 
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -185,84 +174,19 @@ impl LogicalExtensionCodec for DefaultLogicalExtensionCodec {
 
     fn try_decode_table_provider(
         &self,
-        buf: &[u8],
-        table_ref: Arc<datafusion::arrow::datatypes::Schema>,
-        ctx: &SessionContext,
+        _buf: &[u8],
+        _table_ref: Arc<datafusion::arrow::datatypes::Schema>,
+        _ctx: &SessionContext,
     ) -> datafusion::error::Result<Arc<dyn TableProvider>> {
-
-
-        let msg = TableProto::decode(buf).map_err(|_| {
-            DataFusionError::Internal("Error decoding test table".to_string())
-        })?;
-
-        //println!("{:?}", msg);
-
-        let catalog: Arc<dyn Catalog> = tokio::task::block_in_place(|| {
-            // Block on the async read call
-            let rt = tokio::runtime::Runtime::new().unwrap();
-            rt.block_on(async {
-                Arc::new(
-                    SqlCatalog::new(&msg.url, "test", &msg.location, Some(&msg.region))
-                        .await
-                        .unwrap(),
-                )
-            })
-        });
-
-        let table = tokio::task::block_in_place(|| {
-            // Block on the async read call
-            let identifier = Identifier::parse(&msg.identifier).unwrap();
-            let rt = tokio::runtime::Runtime::new().unwrap();
-            rt.block_on(async { catalog.load_tabular(&identifier).await })
-        });
-
-        let table = match table {
-            Ok(tabular) =>  tabular,
-            Err(e) => {
-                eprintln!("Error occurred: {}", e);
-                return Err(DataFusionError::External(Box::new(e)));
-            }
-        };
-
-        // Now you can convert `table` to `DataFusionTable`
-        let table_provider:  DataFusionTable = DataFusionTable::from(table);
-
-        //println!("{:?}", table_provider);
-
-        Ok(Arc::new(table_provider))
+        unimplemented!("try_decode_table_provider is not implemented yet")
     }
 
     fn try_encode_table_provider(
         &self,
-        node: Arc<dyn datafusion::datasource::TableProvider>,
-        buf: &mut Vec<u8>,
+        _node: Arc<dyn datafusion::datasource::TableProvider>,
+        _buf: &mut Vec<u8>,
     ) -> datafusion::error::Result<()> {
-        let table = node.as_any().downcast_ref::<Arc<RwLock<Tabular>>>();
-
-        let read_lock = tokio::task::block_in_place(|| {
-            // Block on the async read call
-            let rt = tokio::runtime::Runtime::new().unwrap();
-            rt.block_on(table.expect("REASON").read())
-        });
-
-        let identifier = read_lock.identifier();
-
-        let binding = read_lock.catalog();
-        let location = binding.location();
-        let region = binding.region();
-        let url = binding.database_url();
-
-        let msg = TableProto {
-            identifier: (&identifier).to_string(), // Added `.to_string()` to convert to String type
-            location: location, // Added `.to_string()` to convert to String type
-            region: region,
-            url: url,
-        };
-
-        //println!("{:?}",msg);
-        msg.encode(buf).map_err(|_| {
-            DataFusionError::Internal("Error encoding test table".to_string())
-        })
+        unimplemented!("try_encode_table_provider is not implemented yet")
     }
 }
 
