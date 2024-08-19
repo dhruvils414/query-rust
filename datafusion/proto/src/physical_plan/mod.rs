@@ -158,6 +158,7 @@ impl AsExecutionPlan for protobuf::PhysicalPlanNode {
                     runtime,
                     extension_codec,
                 )?;
+                println!("At PhysicalPlanType::Filter{:?}", input);
                 let predicate = filter
                     .expr
                     .as_ref()
