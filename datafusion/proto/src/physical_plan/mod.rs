@@ -116,6 +116,8 @@ impl AsExecutionPlan for protobuf::PhysicalPlanNode {
                 "physical_plan::from_proto() Unsupported physical plan '{self:?}'"
             ))
         })?;
+        println!("plan {:?}", plan);
+
         match plan {
             PhysicalPlanType::Explain(explain) => Ok(Arc::new(ExplainExec::new(
                 Arc::new(explain.schema.as_ref().unwrap().try_into()?),
@@ -160,7 +162,7 @@ impl AsExecutionPlan for protobuf::PhysicalPlanNode {
                     runtime,
                     extension_codec,
                 )?;
-                println!("At PhysicalPlanType::Filter{:?}", input);
+                println!("At PhysicalPlanType::Filter {:?}", input);
                 let predicate = filter
                     .expr
                     .as_ref()
