@@ -152,6 +152,8 @@ impl AsExecutionPlan for protobuf::PhysicalPlanNode {
                 Ok(Arc::new(ProjectionExec::try_new(exprs, input)?))
             }
             PhysicalPlanType::Filter(filter) => {
+                println!("in the begiing {:?}", filter);
+
                 let input: Arc<dyn ExecutionPlan> = into_physical_plan(
                     &filter.input,
                     registry,
