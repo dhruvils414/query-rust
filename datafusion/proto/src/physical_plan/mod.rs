@@ -177,6 +177,8 @@ impl AsExecutionPlan for protobuf::PhysicalPlanNode {
                                 .to_owned(),
                         )
                     })?;
+
+                println!("{:?}",filter);
                 let filter_selectivity = filter.default_filter_selectivity.try_into();
                 let filter_exec = input.as_any().downcast_ref::<FilterExec>().unwrap();
                 let filter = FilterExec::try_new(
