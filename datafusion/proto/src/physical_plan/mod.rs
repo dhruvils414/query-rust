@@ -181,8 +181,11 @@ impl AsExecutionPlan for protobuf::PhysicalPlanNode {
                 println!("filter {:?}",filter);
                 let filter_selectivity = filter.default_filter_selectivity.try_into();
                 println!("filter_selectivity {:?}",filter_selectivity);
+
+                println!("filter_exec {:?}",input);
+                println!("filter_exec {:?}",input.as_any().downcast_ref::<FilterExec>());
                 let filter_exec = input.as_any().downcast_ref::<FilterExec>().unwrap();
-                println!("filter_exec {:?}",filter_exec);
+
                 let filter = FilterExec::try_new(
                     predicate,
                     input.clone(),
