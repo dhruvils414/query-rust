@@ -195,6 +195,7 @@ impl RunOpt {
         ctx: &SessionContext,
         sql: &str,
     ) -> Result<Vec<RecordBatch>> {
+        eprintln!("Hail mary! Inside execute_query, run.rs");
         let debug = self.common.debug;
         let plan = ctx.sql(sql).await?;
         let (state, plan) = plan.into_parts();

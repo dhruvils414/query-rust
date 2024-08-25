@@ -166,10 +166,12 @@ impl LogicalExtensionCodec for DefaultLogicalExtensionCodec {
         _inputs: &[LogicalPlan],
         _ctx: &SessionContext,
     ) -> Result<Extension> {
+        println!("LogicalExtensionCodec is not provided :: try_decode");
         not_impl_err!("LogicalExtensionCodec is not provided")
     }
 
     fn try_encode(&self, _node: &Extension, _buf: &mut Vec<u8>) -> Result<()> {
+        println!("LogicalExtensionCodec is not provided :: try_encode");
         not_impl_err!("LogicalExtensionCodec is not provided")
     }
 
@@ -178,16 +180,18 @@ impl LogicalExtensionCodec for DefaultLogicalExtensionCodec {
         _buf: &[u8],
         _table_ref: Arc<datafusion::arrow::datatypes::Schema>,
         _ctx: &SessionContext,
-    ) -> datafusion::error::Result<Arc<dyn TableProvider>> {
-        unimplemented!("try_decode_table_provider is not implemented yet")
+    ) -> Result<Arc<dyn TableProvider>> {
+        println!("LogicalExtensionCodec is not provided :: try_decode_table_provider");
+        not_impl_err!("LogicalExtensionCodec is not provided")
     }
 
     fn try_encode_table_provider(
         &self,
         _node: Arc<dyn datafusion::datasource::TableProvider>,
         _buf: &mut Vec<u8>,
-    ) -> datafusion::error::Result<()> {
-        unimplemented!("try_encode_table_provider is not implemented yet")
+    ) -> Result<()> {
+        println!("LogicalExtensionCodec is not provided :: try_encode_table_provider");
+        not_impl_err!("LogicalExtensionCodec is not provided")
     }
 }
 
@@ -220,10 +224,12 @@ impl AsLogicalPlan for LogicalPlanNode {
     where
         Self: Sized,
     {
-        eprintln!("Decoding Logical Plan");
-        LogicalPlanNode::decode(buf).map_err(|e| {
+        println!("Decoding Logical Plan");
+        let ret_value = LogicalPlanNode::decode(buf).map_err(|e| {
             DataFusionError::Internal(format!("failed to decode logical plan: {e:?}"))
-        })
+        });
+        println!("Decoded Logical Plan {:#?}", ret_value);
+        ret_value
     }
 
     fn try_encode<B>(&self, buf: &mut B) -> Result<()>
@@ -241,11 +247,13 @@ impl AsLogicalPlan for LogicalPlanNode {
         ctx: &SessionContext,
         extension_codec: &dyn LogicalExtensionCodec,
     ) -> Result<LogicalPlan> {
+        println!("Inside try into logical plan function");
+
         let plan = self.logical_plan_type.as_ref();
-        eprintln!("try into logical plan {:#?}", plan.clone());
+        // println!("try into logical plan {:#?}", plan.clone());
         let plan = plan.ok_or_else(|| {
             proto_error(format!(
-                "logical_plan::from_proto() Unsupported logical plan '{self:?}'"
+                "ERROR CHECK:: LOGICAL PLAN :: logical_plan::from_proto() Unsupported logical plan '{self:?}'"
             ))
         })?;
         match plan {

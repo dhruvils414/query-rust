@@ -239,6 +239,7 @@ pub fn logical_plan_from_bytes_with_extension_codec(
     ctx: &SessionContext,
     extension_codec: &dyn LogicalExtensionCodec,
 ) -> Result<LogicalPlan> {
+    println!("inside logical_plan_from_bytes_with_extension_codec");
     let protobuf = protobuf::LogicalPlanNode::decode(bytes)
         .map_err(|e| plan_datafusion_err!("Error decoding expr as protobuf: {e}"))?;
     protobuf.try_into_logical_plan(ctx, extension_codec)
