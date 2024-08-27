@@ -1636,7 +1636,7 @@ impl AsLogicalPlan for LogicalPlanNode {
                 input,
                 output_schema
             }) => {
-                eprintln!("Creating LogicalNode for INSERT function");
+                println!("Creating LogicalNode for INSERT function");
                 let input = protobuf::LogicalPlanNode::try_from_logical_plan(
                     input.as_ref(),
                     extension_codec,
@@ -1651,7 +1651,7 @@ impl AsLogicalPlan for LogicalPlanNode {
                         },
                     ))),
                 };
-                eprintln!("Created LogicalNode for INSERT function with LogicalNode: {:#?}", insert_plan);
+                println!("Created LogicalNode for INSERT function with LogicalNode: {:#?}", insert_plan);
                 Ok(insert_plan)
             },
             LogicalPlan::Dml(_) => Err(proto_error(
