@@ -63,6 +63,7 @@ use datafusion::physical_plan::{
 };
 use datafusion_common::{internal_err, not_impl_err, DataFusionError, Result};
 use datafusion_expr::ScalarUDF;
+use datafusion_expr::FilterOp;
 
 use crate::common::{byte_to_string, proto_error, str_to_byte};
 use crate::convert_required;
@@ -154,7 +155,7 @@ impl AsExecutionPlan for protobuf::PhysicalPlanNode {
                 Ok(Arc::new(ProjectionExec::try_new(exprs, input)?))
             }
             PhysicalPlanType::Filter(filter) => {
-                println!("in the begiing {:?}", filter);
+                println!("in the beginning {:?}", filter);
 
                 let input: Arc<dyn ExecutionPlan> = into_physical_plan(
                     &filter.input,
@@ -186,14 +187,23 @@ impl AsExecutionPlan for protobuf::PhysicalPlanNode {
                 let filter_selectivity = filter.default_filter_selectivity.try_into();
                 println!("filter_selectivity {:?}",filter_selectivity);
 
-                println!("filter_exec {:?}",input);
-                println!("filter_exec {:?}",input.as_any().downcast_ref::<FilterExec>());
-                let filter_exec = input.as_any().downcast_ref::<FilterExec>().unwrap();
+                // println!("filter_exec {:?}",input);
+                // println!("filter_exec {:?}",input.as_any().downcast_ref::<FilterExec>());
+                // let filter_exec = input.as_any().downcast_ref::<FilterExec>().unwrap();
+
+                let filter_op = match filter.filter_op {
+                    0 => Ok(FilterOp::Filter),
+                    1 => Ok(FilterOp::Update),
+                    2 => Ok(FilterOp::Delete),
+                    _ => Err(DataFusionError::Internal(
+                        "FilterOp value is invalid ".to_owned(),
+                    ))
+                }.unwrap();
 
                 let filter = FilterExec::try_new(
                     predicate,
                     input.clone(),
-                    filter_exec.filter_op().clone(),
+                    filter_op
                 )?;
                 match filter_selectivity {
                     Ok(filter_selectivity) => Ok(Arc::new(
@@ -1203,6 +1213,11 @@ impl AsExecutionPlan for protobuf::PhysicalPlanNode {
                             extension_codec,
                         )?),
                         default_filter_selectivity: exec.default_selectivity() as u32,
+                        filter_op: match exec.filter_op() {
+                            FilterOp::Filter => protobuf::FilterOp::Filter,
+                            FilterOp::Update => protobuf::FilterOp::Update,
+                            FilterOp::Delete => protobuf::FilterOp::Delete
+                        }.into()
                     },
                 ))),
             });
