@@ -484,11 +484,21 @@ impl PhysicalPlanner for DefaultPhysicalPlanner {
         session_state: &SessionState,
     ) -> Result<Arc<dyn ExecutionPlan>> {
         match self.handle_explain(logical_plan, session_state).await? {
-            Some(plan) => Ok(plan),
+            Some(plan) => {
+                println!("handle_explain : Some(plan) :: table dhruvil10 exists ?{}",
+                    session_state.clone().check_if_table_exists("dhruvil10").unwrap());
+                Ok(plan)
+            },
             None => {
+                println!("impl PhysicalPlanner for DefaultPhysicalPlanner : table dhruvil10 exists? {}", 
+                session_state.clone().check_if_table_exists("dhurvil10").unwrap());
+
                 let plan = self
                     .create_initial_plan(logical_plan, session_state)
                     .await?;
+
+                println!("After create initial plan : table dhruvil10 exists? {}", 
+                session_state.clone().check_if_table_exists("dhurvil10").unwrap());            
 
                 self.optimize_internal(plan, session_state, |_, _| {})
             }
@@ -673,6 +683,9 @@ impl DefaultPhysicalPlanner {
         flat_tree: Arc<Vec<LogicalNode<'a>>>,
         session_state: &'a SessionState,
     ) -> Result<Option<Arc<dyn ExecutionPlan>>> {
+        println!("Inside task helper function: table dhruvil10 exists? {}", 
+        session_state.clone().check_if_table_exists("dhurvil10").unwrap());
+
         // We always start with a leaf, so can ignore status and pass empty children
         let mut node = flat_tree.get(leaf_starter_index).ok_or_else(|| {
             internal_datafusion_err!(
@@ -688,6 +701,10 @@ impl DefaultPhysicalPlanner {
             )
             .await?;
 
+        println!("Initial Execution plan created : table dhruvil10 exists? {}", 
+            session_state.clone().check_if_table_exists("dhurvil10").unwrap());
+    
+
         let mut current_index = leaf_starter_index;
 
         // parent_index is None only for root
@@ -699,6 +716,7 @@ impl DefaultPhysicalPlanner {
             })?;
             match &node.state {
                 NodeState::ZeroOrOneChild => {
+                    println!("Inside Zero Child Node");
                     plan = self
                         .map_logical_node_to_physical(
                             node.node,
@@ -709,6 +727,7 @@ impl DefaultPhysicalPlanner {
                 }
                 // See if we have all children to build the node.
                 NodeState::TwoOrMoreChildren(children) => {
+                    println!("Inside Multi Child Node");
                     let mut children: Vec<ExecutionPlanChild> = {
                         let mut guard = children.lock().await;
                         // Add our contribution to this parent node.
@@ -885,8 +904,11 @@ impl DefaultPhysicalPlanner {
                 op: WriteOp::InsertInto,
                 ..
             }) => {
+                println!("Inside map Logical Node to Physical :: InsertInto");
                 let name = table_name.table();
+                println!("Table Name to look for {}", name);
                 let schema = session_state.schema_for_ref(table_name.clone())?;
+                println!("Available table names {:#?}", schema.table_names());
                 if let Some(provider) = schema.table(name).await? {
                     let input_exec = children.one()?;
                     provider
@@ -2086,6 +2108,8 @@ impl DefaultPhysicalPlanner {
         logical_plan: &LogicalPlan,
         session_state: &SessionState,
     ) -> Result<Option<Arc<dyn ExecutionPlan>>> {
+        println!("Inside Handle Explain - session state contains table dhruvil10 ? {} ",
+            session_state.check_if_table_exists("dhruvil10").unwrap());
         if let LogicalPlan::Explain(e) = logical_plan {
             use PlanType::*;
             let mut stringified_plans = vec![];

@@ -237,6 +237,7 @@ impl AsLogicalPlan for LogicalPlanNode {
         B: BufMut,
         Self: Sized,
     {
+        println!("Encoding Logical Plan");
         self.encode(buf).map_err(|e| {
             DataFusionError::Internal(format!("failed to encode logical plan: {e:?}"))
         })
@@ -250,7 +251,7 @@ impl AsLogicalPlan for LogicalPlanNode {
         println!("Inside try into logical plan function");
 
         let plan = self.logical_plan_type.as_ref();
-        // println!("try into logical plan {:#?}", plan.clone());
+        println!("try into logical plan {:#?}", plan.clone());
         let plan = plan.ok_or_else(|| {
             proto_error(format!(
                 "ERROR CHECK:: LOGICAL PLAN :: logical_plan::from_proto() Unsupported logical plan '{self:?}'"

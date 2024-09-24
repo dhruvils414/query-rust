@@ -159,8 +159,11 @@ impl Default for DataFrameWriteOptions {
 #[derive(Debug, Clone)]
 pub struct DataFrame {
     // Box the (large) SessionState to reduce the size of DataFrame on the stack
-    session_state: Box<SessionState>,
-    plan: LogicalPlan,
+    /// Session State
+    pub session_state: Box<SessionState>,
+
+    /// Logical Plan
+    pub plan: LogicalPlan,
 }
 
 impl DataFrame {
@@ -177,8 +180,15 @@ impl DataFrame {
     }
 
     /// Consume the DataFrame and produce a physical plan
-    pub async fn create_physical_plan(self) -> Result<Arc<dyn ExecutionPlan>> {
-        self.session_state.create_physical_plan(&self.plan).await
+    pub async fn create_physical_plan(&self) -> Result<Arc<dyn ExecutionPlan>> {
+
+        println!("before create physical plan : table dhruvil10 exists? {}", 
+        self.session_state.as_ref().check_if_table_exists("dhurvil10").unwrap());
+
+        println!("Consuming dataframe to give physical plan");
+        let physical_plan = self.session_state.create_physical_plan(&self.plan).await?;
+
+        Ok(physical_plan)
     }
 
     /// Filter the DataFrame by column. Returns a new DataFrame only containing the
@@ -888,9 +898,23 @@ impl DataFrame {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn collect(self) -> Result<Vec<RecordBatch>> {
+    pub async fn collect(&self) -> Result<Vec<RecordBatch>> {
+        
+        println!("COLLECT FUNCTION :: before creating task Context : table dhruvil10 exists? {}", 
+        self.session_state.as_ref().check_if_table_exists("dhurvil10").unwrap());
+
         let task_ctx = Arc::new(self.task_ctx());
+
+        
+        println!("COLLECT FUNCTION :: before create physical plan : table dhruvil10 exists? {}", 
+        self.session_state.as_ref().check_if_table_exists("dhurvil10").unwrap());
+
         let plan = self.create_physical_plan().await?;
+
+        // checking if table exists
+        println!("after create physical plan : table dhruvil10 exists? {}", 
+        self.session_state.as_ref().check_if_table_exists("dhurvil10").unwrap());
+
         let result = collect(plan, task_ctx).await;
 
         return result;

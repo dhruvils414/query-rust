@@ -193,6 +193,7 @@ pub fn logical_plan_to_bytes(plan: &LogicalPlan) -> Result<Bytes> {
 /// Serialize a LogicalPlan as JSON
 #[cfg(feature = "json")]
 pub fn logical_plan_to_json(plan: &LogicalPlan) -> Result<String> {
+    println!("Converting logical plan to JSON...");
     let extension_codec = DefaultLogicalExtensionCodec {};
     let protobuf =
         protobuf::LogicalPlanNode::try_from_logical_plan(plan, &extension_codec)
@@ -206,6 +207,7 @@ pub fn logical_plan_to_bytes_with_extension_codec(
     plan: &LogicalPlan,
     extension_codec: &dyn LogicalExtensionCodec,
 ) -> Result<Bytes> {
+    println!("Converting logical plan to bytes...");
     let protobuf =
         protobuf::LogicalPlanNode::try_from_logical_plan(plan, extension_codec)?;
     let mut buffer = BytesMut::new();

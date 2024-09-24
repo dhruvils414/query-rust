@@ -487,6 +487,7 @@ impl SessionContext {
     /// SQL, see [`Self::sql_with_options`] and
     /// [`SQLOptions::verify_plan`].
     pub async fn execute_logical_plan(&self, plan: LogicalPlan) -> Result<DataFrame> {
+        println!("Executing Logical Plan");
         match plan {
             LogicalPlan::Ddl(ddl) => {
                 // Box::pin avoids allocating the stack space within this function's frame
@@ -1207,9 +1208,11 @@ impl SessionContext {
         let table_ref: TableReference = table_ref.into();
         let table = table_ref.table();
         let table_ref = table_ref.clone();
-        Ok(self
+        let temp = self
             .state
-            .read()
+            .read();
+
+        Ok(temp
             .schema_for_ref(table_ref)?
             .table_exist(table))
     }
@@ -1343,7 +1346,12 @@ impl QueryPlanner for DefaultQueryPlanner {
         logical_plan: &LogicalPlan,
         session_state: &SessionState,
     ) -> Result<Arc<dyn ExecutionPlan>> {
+        println!("impl QueryPlanner : create_physical_plan");
         let planner = DefaultPhysicalPlanner::default();
+
+        println!("impl Queryplanner : table dhruvil10 exists? {}", 
+        session_state.clone().check_if_table_exists("dhurvil10").unwrap());
+
         planner
             .create_physical_plan(logical_plan, session_state)
             .await
@@ -1444,6 +1452,23 @@ impl SessionState {
         let catalog_list =
             Arc::new(MemoryCatalogProviderList::new()) as Arc<dyn CatalogProviderList>;
         Self::new_with_config_rt_and_catalog_list(config, runtime, catalog_list)
+    }
+
+    /// Checks if a table exists in the current session state.
+    ///
+    /// # Arguments
+    /// * `table_ref` - A reference to the table to check for existence.
+    ///
+    /// # Returns
+    /// `true` if the table exists, `false` otherwise.
+    pub fn check_if_table_exists(&self, table_ref: impl Into<TableReference>) -> Result<bool> {
+        let table_ref: TableReference = table_ref.into();
+        let table = table_ref.table();
+        let table_ref = table_ref.clone();
+    
+        Ok(self
+            .schema_for_ref(table_ref)?
+            .table_exist(table))
     }
 
     /// Returns new [`SessionState`] using the provided
@@ -1601,7 +1626,14 @@ impl SessionState {
             .resolve(&catalog.default_catalog, &catalog.default_schema)
     }
 
-    pub(crate) fn schema_for_ref(
+    /// Returns the schema provider for the given table reference.
+    ///
+    /// If the table reference resolves to the information schema, this will return an `InformationSchemaProvider`.
+    /// Otherwise, it will resolve the catalog and schema from the table reference and return the corresponding schema provider.
+    ///
+    /// # Errors
+    /// Returns an error if the catalog or schema cannot be resolved.
+    pub fn schema_for_ref(
         &self,
         table_ref: impl Into<TableReference>,
     ) -> Result<Arc<dyn SchemaProvider>> {
@@ -1998,7 +2030,12 @@ impl SessionState {
         &self,
         logical_plan: &LogicalPlan,
     ) -> Result<Arc<dyn ExecutionPlan>> {
+        println!("impl SessionState : create_physical_plan");
         let logical_plan = self.optimize(logical_plan)?;
+
+        println!("Inside create physical plan : table dhruvil10 exists? {}", 
+        self.check_if_table_exists("dhurvil10").unwrap());
+
         self.query_planner
             .create_physical_plan(&logical_plan, self)
             .await
