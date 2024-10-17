@@ -694,7 +694,6 @@ impl ParquetFileReaderFactory for DefaultParquetFileReaderFactory {
             inner = inner.with_footer_size_hint(hint)
         };
 
-        println!("file_meta {:?}", file_meta);
         Ok(Box::new(ParquetFileReader {
             inner,
             file_metrics,
