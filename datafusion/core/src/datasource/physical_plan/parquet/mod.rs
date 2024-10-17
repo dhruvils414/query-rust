@@ -111,7 +111,6 @@ impl ParquetExec {
             MetricBuilder::new(&metrics).global_counter("num_predicate_creation_errors");
 
         let file_schema = &base_config.file_schema;
-        println!("file_schema {:?}", file_schema);
         let pruning_predicate = predicate
             .clone()
             .and_then(|predicate_expr| {
@@ -147,8 +146,6 @@ impl ParquetExec {
             &projected_output_ordering,
             &base_config,
         );
-
-        println!("Finishing ");
         Self {
             base_config,
             projected_statistics,
@@ -459,6 +456,8 @@ struct ParquetOpener {
 
 impl FileOpener for ParquetOpener {
     fn open(&self, file_meta: FileMeta) -> Result<FileOpenFuture> {
+
+        println!("in the reading");
         let file_range = file_meta.range.clone();
 
         let file_metrics = ParquetFileMetrics::new(
