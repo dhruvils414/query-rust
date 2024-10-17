@@ -420,6 +420,7 @@ impl ExecutionPlan for ParquetExec {
             enable_bloom_filter: self.bloom_filter_on_read(),
         };
 
+        println!("After ParquetOpener");
         let stream =
             FileStream::new(&self.base_config, partition_index, opener, &self.metrics)?;
 
