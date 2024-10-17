@@ -103,7 +103,7 @@ impl ParquetExec {
         metadata_size_hint: Option<usize>,
         table_parquet_options: TableParquetOptions,
     ) -> Self {
-        println!("Creating ParquetExec, files: {:?}, projection {:?}, predicate: {:?}, limit: {:?}",
+        debug!("Creating ParquetExec, files: {:?}, projection {:?}, predicate: {:?}, limit: {:?}",
         base_config.file_groups, base_config.projection, predicate, base_config.limit);
 
         let metrics = ExecutionPlanMetricsSet::new();
@@ -111,6 +111,7 @@ impl ParquetExec {
             MetricBuilder::new(&metrics).global_counter("num_predicate_creation_errors");
 
         let file_schema = &base_config.file_schema;
+        println!("file_schema {:?}", file_schema);
         let pruning_predicate = predicate
             .clone()
             .and_then(|predicate_expr| {
@@ -146,6 +147,8 @@ impl ParquetExec {
             &projected_output_ordering,
             &base_config,
         );
+
+        println!("Finishing ");
         Self {
             base_config,
             projected_statistics,
