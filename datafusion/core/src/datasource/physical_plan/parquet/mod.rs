@@ -103,7 +103,7 @@ impl ParquetExec {
         metadata_size_hint: Option<usize>,
         table_parquet_options: TableParquetOptions,
     ) -> Self {
-        debug!("Creating ParquetExec, files: {:?}, projection {:?}, predicate: {:?}, limit: {:?}",
+        println!("Creating ParquetExec, files: {:?}, projection {:?}, predicate: {:?}, limit: {:?}",
         base_config.file_groups, base_config.projection, predicate, base_config.limit);
 
         let metrics = ExecutionPlanMetricsSet::new();
