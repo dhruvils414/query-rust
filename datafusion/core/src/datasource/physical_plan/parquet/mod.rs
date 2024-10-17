@@ -420,7 +420,6 @@ impl ExecutionPlan for ParquetExec {
             enable_bloom_filter: self.bloom_filter_on_read(),
         };
 
-        println!("After ParquetOpener");
         let stream =
             FileStream::new(&self.base_config, partition_index, opener, &self.metrics)?;
 
@@ -458,7 +457,6 @@ struct ParquetOpener {
 impl FileOpener for ParquetOpener {
     fn open(&self, file_meta: FileMeta) -> Result<FileOpenFuture> {
 
-        println!("in the reading");
         let file_range = file_meta.range.clone();
 
         let file_metrics = ParquetFileMetrics::new(
@@ -696,6 +694,7 @@ impl ParquetFileReaderFactory for DefaultParquetFileReaderFactory {
             inner = inner.with_footer_size_hint(hint)
         };
 
+        println!("file_meta {:?}", file_meta);
         Ok(Box::new(ParquetFileReader {
             inner,
             file_metrics,
