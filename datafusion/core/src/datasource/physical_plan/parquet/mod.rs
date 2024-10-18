@@ -505,8 +505,6 @@ impl FileOpener for ParquetOpener {
                 schema_adapter.map_schema(&file_schema)?;
             // let predicate = predicate.map(|p| reassign_predicate_columns(p, builder.schema(), true)).transpose()?;
 
-            println!("schema_mapping {:?} adapted_projections {:?}", schema_mapping,adapted_projections);
-
             let mask = ProjectionMask::roots(
                 builder.parquet_schema(),
                 adapted_projections.iter().cloned(),
@@ -593,6 +591,8 @@ impl FileOpener for ParquetOpener {
                 .with_batch_size(batch_size)
                 .with_row_groups(row_groups)
                 .build()?;
+
+            println!("stream {:?}", stream);
 
             let adapted = stream
                 .map_err(|e| ArrowError::ExternalError(Box::new(e)))
