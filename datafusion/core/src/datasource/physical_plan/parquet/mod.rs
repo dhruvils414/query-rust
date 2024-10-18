@@ -697,7 +697,7 @@ impl ParquetFileReaderFactory for DefaultParquetFileReaderFactory {
             inner = inner.with_footer_size_hint(hint)
         };
 
-        Ok(Box::new(s {
+        Ok(Box::new(ParquetFileReader {
             inner,
             file_metrics,
         }))
