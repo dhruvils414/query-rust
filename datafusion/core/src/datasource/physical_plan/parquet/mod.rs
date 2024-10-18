@@ -498,9 +498,14 @@ impl FileOpener for ParquetOpener {
 
             let file_schema = builder.schema().clone();
 
+            println!("file_schema {:?}", file_schema);
+
+
             let (schema_mapping, adapted_projections) =
                 schema_adapter.map_schema(&file_schema)?;
             // let predicate = predicate.map(|p| reassign_predicate_columns(p, builder.schema(), true)).transpose()?;
+
+            println!("schema_mapping {:?} adapted_projections {:?}", schema_mapping,adapted_projections);
 
             let mask = ProjectionMask::roots(
                 builder.parquet_schema(),
@@ -690,8 +695,6 @@ impl ParquetFileReaderFactory for DefaultParquetFileReaderFactory {
 
         let store = Arc::clone(&self.store);
         let mut inner = ParquetObjectReader::new(store, file_meta.object_meta);
-
-        println!("inner {:?}", inner);
 
         if let Some(hint) = metadata_size_hint {
             inner = inner.with_footer_size_hint(hint)
