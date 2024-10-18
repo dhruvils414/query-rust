@@ -687,6 +687,9 @@ impl ParquetFileReaderFactory for DefaultParquetFileReaderFactory {
             file_meta.location().as_ref(),
             metrics,
         );
+
+        println!("partition_index : {:?}", partition_index);
+        println!("file_meta : {:?}", file_meta);
         let store = Arc::clone(&self.store);
         let mut inner = ParquetObjectReader::new(store, file_meta.object_meta);
 
@@ -694,7 +697,7 @@ impl ParquetFileReaderFactory for DefaultParquetFileReaderFactory {
             inner = inner.with_footer_size_hint(hint)
         };
 
-        Ok(Box::new(ParquetFileReader {
+        Ok(Box::new(s {
             inner,
             file_metrics,
         }))
