@@ -688,10 +688,10 @@ impl ParquetFileReaderFactory for DefaultParquetFileReaderFactory {
             metrics,
         );
 
-        println!("partition_index : {:?}", partition_index);
-        //println!("file_meta : {:?}", file_meta);
         let store = Arc::clone(&self.store);
         let mut inner = ParquetObjectReader::new(store, file_meta.object_meta);
+
+        println!("inner {:?}", inner);
 
         if let Some(hint) = metadata_size_hint {
             inner = inner.with_footer_size_hint(hint)
