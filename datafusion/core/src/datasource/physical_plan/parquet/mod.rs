@@ -592,7 +592,7 @@ impl FileOpener for ParquetOpener {
                 .with_row_groups(row_groups)
                 .build()?;
 
-            println!("stream {:?}", stream);
+
 
             let adapted = stream
                 .map_err(|e| ArrowError::ExternalError(Box::new(e)))
@@ -601,6 +601,7 @@ impl FileOpener for ParquetOpener {
                         .and_then(|b| schema_mapping.map_batch(b).map_err(Into::into))
                 });
 
+            println!("adapted");
             Ok(adapted.boxed())
         }))
     }
