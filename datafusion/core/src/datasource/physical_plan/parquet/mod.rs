@@ -498,9 +498,6 @@ impl FileOpener for ParquetOpener {
 
             let file_schema = builder.schema().clone();
 
-            println!("file_schema {:?}", file_schema);
-
-
             let (schema_mapping, adapted_projections) =
                 schema_adapter.map_schema(&file_schema)?;
             // let predicate = predicate.map(|p| reassign_predicate_columns(p, builder.schema(), true)).transpose()?;
@@ -601,7 +598,8 @@ impl FileOpener for ParquetOpener {
                         .and_then(|b| schema_mapping.map_batch(b).map_err(Into::into))
                 });
 
-            println!("adapted");
+            println!("maybe_batch {:?}",adapted );
+
             Ok(adapted.boxed())
         }))
     }
