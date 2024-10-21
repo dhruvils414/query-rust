@@ -598,8 +598,6 @@ impl FileOpener for ParquetOpener {
                         .and_then(|b| schema_mapping.map_batch(b).map_err(Into::into))
                 });
 
-            println!("maybe_batch {:?}",adapted );
-
             Ok(adapted.boxed())
         }))
     }
