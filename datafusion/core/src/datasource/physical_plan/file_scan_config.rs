@@ -319,7 +319,7 @@ impl PartitionColumnProjector {
         println!(" self.projected_schema.fields() {:?}",  self.projected_schema.fields());
         println!("self.projected_partition_indexes {:?}", self.projected_partition_indexes );
         let expected_cols =
-            self.projected_schema.fields().len() - self.projected_partition_indexes.len();
+            self.projected_schema.fields().len();  //- self.projected_partition_indexes.len();
 
         if file_batch.columns().len() != expected_cols {
             return exec_err!(
