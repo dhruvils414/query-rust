@@ -317,7 +317,7 @@ impl PartitionColumnProjector {
     ) -> Result<RecordBatch> {
 
         println!(" self.projected_schema.fields() {:?}",  self.projected_schema.fields());
-        println!("self.projected_partition_indexes {:?}", self.projected_partition_indexes. );
+        println!("self.projected_partition_indexes {:?}", self.projected_partition_indexes );
         let expected_cols =
             self.projected_schema.fields().len() - self.projected_partition_indexes.len();
 
